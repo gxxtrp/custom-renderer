@@ -8,9 +8,12 @@
 
 namespace engine::platform {
 
-Window::Window(const WindowDesc& desc) : m_title(desc.title), m_width(desc.width), m_height(desc.height) {
+std::expected<Window, std::string> Window::create(const WindowDesc& desc) {
     if (!Platform::isInitialized()) {
-        Platform::init();
+        auto initResult = Platform::init();
+        if (!initResult) {
+            return std::unexpected(initResult.error());
+        }
     }
 
     SDL_WindowFlags flags = SDL_WINDOW_VULKAN;
@@ -21,23 +24,29 @@ Window::Window(const WindowDesc& desc) : m_title(desc.title), m_width(desc.width
         flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
     }
 
-    m_window = SDL_CreateWindow(desc.title.c_str(), static_cast<int>(desc.width), static_cast<int>(desc.height), flags);
+    SDL_Window* nativeWindow =
+        SDL_CreateWindow(desc.title.c_str(), static_cast<int>(desc.width), static_cast<int>(desc.height), flags);
 
-    if (!m_window) {
-        ENGINE_LOG_ERROR("Failed to create SDL3 window: {}", SDL_GetError());
-        return;
+    if (!nativeWindow) {
+        std::string err = SDL_GetError();
+        ENGINE_LOG_ERROR("Failed to create SDL3 window: {}", err);
+        return std::unexpected(std::move(err));
     }
 
-    int w = 0;
-    int h = 0;
-    SDL_GetWindowSizeInPixels(m_window, &w, &h);
-    if (w > 0 && h > 0) {
-        m_width = static_cast<core::u32>(w);
-        m_height = static_cast<core::u32>(h);
-    }
+    int pixelWidth = 0;
+    int pixelHeight = 0;
+    SDL_GetWindowSizeInPixels(nativeWindow, &pixelWidth, &pixelHeight);
 
+    const auto finalWidth = (pixelWidth > 0) ? static_cast<core::u32>(pixelWidth) : desc.width;
+    const auto finalHeight = (pixelHeight > 0) ? static_cast<core::u32>(pixelHeight) : desc.height;
+
+    ENGINE_LOG_INFO("Created window '{}' ({}x{})", desc.title, finalWidth, finalHeight);
+    return Window(nativeWindow, desc.title, finalWidth, finalHeight);
+}
+
+Window::Window(SDL_Window* window, std::string title, core::u32 width, core::u32 height)
+    : m_window(window), m_title(std::move(title)), m_width(width), m_height(height) {
     Platform::registerWindow(this);
-    ENGINE_LOG_INFO("Created window '{}' ({}x{})", m_title, m_width, m_height);
 }
 
 Window::~Window() {

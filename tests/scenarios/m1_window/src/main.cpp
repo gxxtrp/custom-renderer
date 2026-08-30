@@ -44,9 +44,10 @@ int main(int /*argc*/, char** /*argv*/) {
                         transformedPoint.z);
     }
 
-    // Initialize Platform & Window
-    if (!Platform::init()) {
-        ENGINE_LOG_CRITICAL("Failed to initialize platform subsystem");
+    // Initialize Platform subsystem
+    auto initResult = Platform::init();
+    if (!initResult) {
+        ENGINE_LOG_CRITICAL("Failed to initialize platform subsystem: {}", initResult.error());
         return 1;
     }
 
@@ -57,13 +58,14 @@ int main(int /*argc*/, char** /*argv*/) {
                               .resizable = true,
                               .highDpi = true};
 
-        Window window(desc);
-        if (window.getNativeHandle() == nullptr) {
-            ENGINE_LOG_CRITICAL("Failed to create native window");
+        auto windowResult = Window::create(desc);
+        if (!windowResult) {
+            ENGINE_LOG_CRITICAL("Failed to create native window: {}", windowResult.error());
             Platform::shutdown();
             return 1;
         }
 
+        Window window = std::move(windowResult.value());
         ENGINE_LOG_INFO("Main loop started. Press ESC or close window to exit.");
 
         tests::common::Timer timer;

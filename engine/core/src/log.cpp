@@ -1,12 +1,15 @@
-#include <vector>
+#include <memory>
 
 #include <engine/core/log.hpp>
 
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 namespace engine::core {
 
 namespace {
+
+std::shared_ptr<spdlog::logger> sLogger = nullptr;
 
 spdlog::level::level_enum toSpdlogLevel(LogLevel level) {
     switch (level) {
@@ -29,8 +32,6 @@ spdlog::level::level_enum toSpdlogLevel(LogLevel level) {
 }
 
 }  // namespace
-
-std::shared_ptr<spdlog::logger> Log::sLogger = nullptr;
 
 void Log::init(LogLevel level) {
     if (sLogger) {
@@ -61,11 +62,11 @@ void Log::setLevel(LogLevel level) {
     }
 }
 
-std::shared_ptr<spdlog::logger>& Log::getLogger() {
+spdlog::logger* Log::getLogger() {
     if (!sLogger) {
         init();
     }
-    return sLogger;
+    return sLogger.get();
 }
 
 }  // namespace engine::core

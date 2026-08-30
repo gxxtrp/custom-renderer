@@ -1,5 +1,5 @@
 # CompilerWarnings.cmake
-# Configures strict compiler warnings as errors
+# Configures strict compiler warnings as errors and zero exceptions/RTTI
 
 function(engine_set_compiler_warnings target_name)
     if(NOT TARGET ${target_name})
@@ -23,12 +23,16 @@ function(engine_set_compiler_warnings target_name)
         -Wformat=2
         -Wimplicit-fallthrough
         -Werror
+        -fno-exceptions
+        -fno-rtti
     )
 
     set(CLANG_CL_WARNINGS
         /W4
         /WX
         /permissive-
+        /EHs-c- # disable C++ exceptions
+        /GR-    # disable RTTI
         /w14242 # conversion from 'type1' to 'type2', possible loss of data
         /w14254 # conversion from 'type1' to 'type2', possible loss of data
         /w14263 # member function does not override any base class virtual member function
@@ -53,6 +57,8 @@ function(engine_set_compiler_warnings target_name)
         /W4
         /WX
         /permissive-
+        /EHs-c-
+        /GR-
     )
 
     set(GCC_WARNINGS
@@ -72,6 +78,8 @@ function(engine_set_compiler_warnings target_name)
         -Wformat=2
         -Wimplicit-fallthrough
         -Werror
+        -fno-exceptions
+        -fno-rtti
     )
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -85,4 +93,6 @@ function(engine_set_compiler_warnings target_name)
     elseif(MSVC)
         target_compile_options(${target_name} PRIVATE ${MSVC_WARNINGS})
     endif()
+
+    target_compile_definitions(${target_name} PRIVATE SPDLOG_NO_EXCEPTIONS=1)
 endfunction()

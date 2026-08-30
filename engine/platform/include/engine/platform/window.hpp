@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <string>
 
 #include <engine/core/types.hpp>
@@ -18,7 +19,8 @@ struct WindowDesc {
 
 class Window {
 public:
-    explicit Window(const WindowDesc& desc);
+    static std::expected<Window, std::string> create(const WindowDesc& desc);
+
     ~Window();
 
     Window(const Window&) = delete;
@@ -43,6 +45,8 @@ public:
     void onResize(core::u32 width, core::u32 height) noexcept;
 
 private:
+    explicit Window(SDL_Window* window, std::string title, core::u32 width, core::u32 height);
+
     SDL_Window* m_window{nullptr};
     std::string m_title;
     core::u32 m_width{0};

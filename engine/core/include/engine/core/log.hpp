@@ -1,7 +1,5 @@
 #pragma once
 
-#include <memory>
-
 #include <engine/core/types.hpp>
 
 #include <spdlog/spdlog.h>
@@ -15,10 +13,7 @@ public:
     static void init(LogLevel level = LogLevel::Info);
     static void shutdown();
     static void setLevel(LogLevel level);
-    static std::shared_ptr<spdlog::logger>& getLogger();
-
-private:
-    static std::shared_ptr<spdlog::logger> sLogger;
+    static spdlog::logger* getLogger();
 };
 
 }  // namespace engine::core

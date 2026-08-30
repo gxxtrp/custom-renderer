@@ -114,19 +114,20 @@ MouseButton translateMouseButton(core::u8 button) {
 
 }  // namespace
 
-bool Platform::init() {
+std::expected<void, std::string> Platform::init() {
     if (sInitialized) {
-        return true;
+        return {};
     }
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        ENGINE_LOG_CRITICAL("Failed to initialize SDL3: {}", SDL_GetError());
-        return false;
+        std::string err = SDL_GetError();
+        ENGINE_LOG_CRITICAL("Failed to initialize SDL3: {}", err);
+        return std::unexpected(std::move(err));
     }
 
     sInitialized = true;
     ENGINE_LOG_INFO("Initialized SDL3 platform subsystem");
-    return true;
+    return {};
 }
 
 void Platform::shutdown() {
@@ -228,6 +229,10 @@ InputState& Platform::getInputMutable() noexcept {
 
 bool Platform::isInitialized() noexcept {
     return sInitialized;
+}
+
+std::span<Window* const> Platform::getWindows() noexcept {
+    return sWindows;
 }
 
 void Platform::registerWindow(Window* window) {
