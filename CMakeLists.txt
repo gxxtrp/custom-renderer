@@ -14,6 +14,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(EngineModule)
 include(CompilerWarnings)
+include(EngineShaders)
 
 # Global Options
 option(ENGINE_PROFILING_ENABLE "Enable Tracy profiling" OFF)
