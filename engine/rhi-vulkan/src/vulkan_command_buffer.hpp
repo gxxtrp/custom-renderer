@@ -53,6 +53,9 @@ public:
   void copyBuffer(rhi::Buffer &src, rhi::Buffer &dst, core::usize size,
                   core::usize srcOffset = 0,
                   core::usize dstOffset = 0) override;
+  void
+  copyBufferToTexture(rhi::Buffer &src, rhi::Texture &dst,
+                      std::span<const rhi::BufferTextureCopy> regions) override;
 
   [[nodiscard]] VkCommandBuffer getVkCommandBuffer() const noexcept {
     return m_commandBuffer;

@@ -11,6 +11,7 @@
 #include "vulkan_physical_device.hpp"
 #include "vulkan_pipeline.hpp"
 #include "vulkan_profiler.hpp"
+#include "vulkan_sampler.hpp"
 #include "vulkan_swapchain.hpp"
 #include "vulkan_sync.hpp"
 #include "vulkan_texture.hpp"
@@ -263,6 +264,15 @@ VulkanDevice::createTexture(const rhi::TextureDesc &desc) {
     return std::unexpected(texRes.error());
   }
   return std::unique_ptr<rhi::Texture>(std::move(texRes.value()));
+}
+
+std::expected<std::unique_ptr<rhi::Sampler>, std::string>
+VulkanDevice::createSampler(const rhi::SamplerDesc &desc) {
+  auto samplerRes = VulkanSampler::create(m_impl->device, desc);
+  if (!samplerRes) {
+    return std::unexpected(samplerRes.error());
+  }
+  return std::unique_ptr<rhi::Sampler>(std::move(samplerRes.value()));
 }
 
 std::expected<std::unique_ptr<rhi::Pipeline>, std::string>

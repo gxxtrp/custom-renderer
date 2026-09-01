@@ -8,12 +8,68 @@
 #include <vector>
 
 #include <engine/core/log.hpp>
+#include <engine/core/mat4.hpp>
+#include <engine/core/quat.hpp>
+#include <engine/core/vec3.hpp>
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
 #include <meshoptimizer.h>
 
+#include "stb_image.h"
+
 namespace engine::assets {
+
+namespace {
+
+core::Mat4 toEngineMat4(const fastgltf::math::fmat4x4 &m) {
+  core::Mat4 mat;
+  for (core::usize col = 0; col < 4; ++col) {
+    for (core::usize row = 0; row < 4; ++row) {
+      mat(row, col) = m[col][row];
+    }
+  }
+  return mat;
+}
+
+void traverseNodeHierarchy(const fastgltf::Asset &asset, core::usize nodeIndex,
+                           const fastgltf::math::fmat4x4 &parentTransform,
+                           std::vector<GltfMeshInstance> &outInstances) {
+  if (nodeIndex >= asset.nodes.size()) {
+    return;
+  }
+
+  const auto &node = asset.nodes[nodeIndex];
+  const fastgltf::math::fmat4x4 worldTransform =
+      fastgltf::getTransformMatrix(node, parentTransform);
+
+  if (node.meshIndex.has_value()) {
+    const auto meshIdx = static_cast<core::u32>(node.meshIndex.value());
+    if (meshIdx < asset.meshes.size()) {
+      const auto &mesh = asset.meshes[meshIdx];
+      for (core::usize primIdx = 0; primIdx < mesh.primitives.size();
+           ++primIdx) {
+        const auto &prim = mesh.primitives[primIdx];
+        const core::u32 matIdx =
+            prim.materialIndex.has_value()
+                ? static_cast<core::u32>(prim.materialIndex.value())
+                : 0;
+
+        outInstances.push_back(GltfMeshInstance{
+            .meshIndex = meshIdx,
+            .materialIndex = matIdx,
+            .transform = toEngineMat4(worldTransform),
+        });
+      }
+    }
+  }
+
+  for (auto childIdx : node.children) {
+    traverseNodeHierarchy(asset, childIdx, worldTransform, outInstances);
+  }
+}
+
+} // namespace
 
 MeshAsset buildMeshletsFromGeometry(std::span<const Vertex> vertices,
                                     std::span<const core::u32> indices,
@@ -226,6 +282,283 @@ loadGltfMesh(const std::filesystem::path &path,
   ENGINE_LOG_INFO("Loaded glTF mesh '{}': {} vertices, {} indices",
                   path.string(), vertices.size(), indices.size());
   return buildMeshletsFromGeometry(vertices, indices, options);
+}
+
+std::expected<GltfSceneAsset, std::string>
+loadGltfScene(const std::filesystem::path &path,
+              const MeshletBuildOptions &options) {
+  if (!std::filesystem::exists(path)) {
+    return std::unexpected("File does not exist: " + path.string());
+  }
+
+  auto dataBuffer = fastgltf::GltfDataBuffer::FromPath(path);
+  if (dataBuffer.error() != fastgltf::Error::None) {
+    return std::unexpected("Failed to open glTF file: " + path.string());
+  }
+
+  fastgltf::Parser parser;
+  constexpr auto gltfOptions = fastgltf::Options::LoadExternalBuffers |
+                               fastgltf::Options::LoadExternalImages |
+                               fastgltf::Options::DecomposeNodeMatrices;
+  auto parsed =
+      parser.loadGltf(dataBuffer.get(), path.parent_path(), gltfOptions);
+  if (parsed.error() != fastgltf::Error::None) {
+    return std::unexpected(
+        "Failed to parse glTF error code: " +
+        std::to_string(fastgltf::to_underlying(parsed.error())));
+  }
+
+  const fastgltf::Asset &asset = parsed.get();
+  GltfSceneAsset sceneAsset;
+
+  // 1. Decode Images into TextureAsset
+  std::vector<core::u32> imageToTextureMap(asset.images.size(), 0);
+  for (core::usize imgIdx = 0; imgIdx < asset.images.size(); ++imgIdx) {
+    const auto &image = asset.images[imgIdx];
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    stbi_uc *pixelData = nullptr;
+
+    std::visit(fastgltf::visitor{
+                   [&](const fastgltf::sources::URI &uri) {
+                     const auto fullPath =
+                         path.parent_path() / std::string(uri.uri.path());
+                     pixelData = stbi_load(fullPath.string().c_str(), &width,
+                                           &height, &channels, 4);
+                   },
+                   [&](const fastgltf::sources::Vector &vec) {
+                     pixelData = stbi_load_from_memory(
+                         reinterpret_cast<const stbi_uc *>(vec.bytes.data()),
+                         static_cast<int>(vec.bytes.size()), &width, &height,
+                         &channels, 4);
+                   },
+                   [&](const fastgltf::sources::Array &arr) {
+                     pixelData = stbi_load_from_memory(
+                         reinterpret_cast<const stbi_uc *>(arr.bytes.data()),
+                         static_cast<int>(arr.bytes.size()), &width, &height,
+                         &channels, 4);
+                   },
+                   [&](const fastgltf::sources::BufferView &view) {
+                     if (view.bufferViewIndex < asset.bufferViews.size()) {
+                       const auto &bv = asset.bufferViews[view.bufferViewIndex];
+                       if (bv.bufferIndex < asset.buffers.size()) {
+                         const auto &buf = asset.buffers[bv.bufferIndex];
+                         std::visit(
+                             fastgltf::visitor{
+                                 [&](const fastgltf::sources::Vector &vec) {
+                                   if (bv.byteOffset + bv.byteLength <=
+                                       vec.bytes.size()) {
+                                     const auto *ptr =
+                                         reinterpret_cast<const stbi_uc *>(
+                                             vec.bytes.data() + bv.byteOffset);
+                                     pixelData = stbi_load_from_memory(
+                                         ptr, static_cast<int>(bv.byteLength),
+                                         &width, &height, &channels, 4);
+                                   }
+                                 },
+                                 [&](const fastgltf::sources::Array &arr) {
+                                   if (bv.byteOffset + bv.byteLength <=
+                                       arr.bytes.size()) {
+                                     const auto *ptr =
+                                         reinterpret_cast<const stbi_uc *>(
+                                             arr.bytes.data() + bv.byteOffset);
+                                     pixelData = stbi_load_from_memory(
+                                         ptr, static_cast<int>(bv.byteLength),
+                                         &width, &height, &channels, 4);
+                                   }
+                                 },
+                                 [&](const auto &) {}},
+                             buf.data);
+                       }
+                     }
+                   },
+                   [&](const auto &) {}},
+               image.data);
+
+    if (pixelData != nullptr && width > 0 && height > 0) {
+      std::vector<core::u8> rawBytes(pixelData,
+                                     pixelData + (width * height * 4));
+      stbi_image_free(pixelData);
+
+      const auto textureIdx =
+          static_cast<core::u32>(sceneAsset.textures.size());
+      sceneAsset.textures.emplace_back(
+          width, height, 4, rhi::Format::RGBA8_UNORM, std::move(rawBytes));
+      imageToTextureMap[imgIdx] = textureIdx;
+    } else {
+      ENGINE_LOG_WARN("Failed to load image {} in glTF: {}", imgIdx,
+                      image.name);
+    }
+  }
+
+  auto getTextureIndex = [&](std::optional<core::usize> texIdx) -> core::u32 {
+    if (!texIdx.has_value() || texIdx.value() >= asset.textures.size()) {
+      return 0;
+    }
+    const auto &tex = asset.textures[texIdx.value()];
+    if (!tex.imageIndex.has_value() ||
+        tex.imageIndex.value() >= imageToTextureMap.size()) {
+      return 0;
+    }
+    return imageToTextureMap[tex.imageIndex.value()];
+  };
+
+  // 2. Parse Materials
+  for (const auto &gltfMat : asset.materials) {
+    MaterialAsset mat{};
+    mat.baseColorFactor = core::Vec4(
+        gltfMat.pbrData.baseColorFactor[0], gltfMat.pbrData.baseColorFactor[1],
+        gltfMat.pbrData.baseColorFactor[2], gltfMat.pbrData.baseColorFactor[3]);
+    mat.metallicFactor = gltfMat.pbrData.metallicFactor;
+    mat.roughnessFactor = gltfMat.pbrData.roughnessFactor;
+    mat.emissiveFactor =
+        core::Vec3(gltfMat.emissiveFactor[0], gltfMat.emissiveFactor[1],
+                   gltfMat.emissiveFactor[2]);
+    mat.alphaCutoff = gltfMat.alphaCutoff;
+
+    core::u32 flags = 0;
+    if (gltfMat.doubleSided) {
+      flags |= static_cast<core::u32>(MaterialFlags::DoubleSided);
+    }
+    if (gltfMat.alphaMode == fastgltf::AlphaMode::Blend) {
+      flags |= static_cast<core::u32>(MaterialFlags::AlphaBlend);
+    } else if (gltfMat.alphaMode == fastgltf::AlphaMode::Mask) {
+      flags |= static_cast<core::u32>(MaterialFlags::AlphaMask);
+    }
+    mat.flags = flags;
+
+    if (gltfMat.pbrData.baseColorTexture.has_value()) {
+      mat.baseColorTextureIndex =
+          getTextureIndex(gltfMat.pbrData.baseColorTexture->textureIndex);
+    }
+    if (gltfMat.normalTexture.has_value()) {
+      mat.normalTextureIndex =
+          getTextureIndex(gltfMat.normalTexture->textureIndex);
+      mat.normalScale = gltfMat.normalTexture->scale;
+    }
+    if (gltfMat.pbrData.metallicRoughnessTexture.has_value()) {
+      mat.metallicRoughnessTextureIndex = getTextureIndex(
+          gltfMat.pbrData.metallicRoughnessTexture->textureIndex);
+    }
+    if (gltfMat.emissiveTexture.has_value()) {
+      mat.emissiveTextureIndex =
+          getTextureIndex(gltfMat.emissiveTexture->textureIndex);
+    }
+    if (gltfMat.occlusionTexture.has_value()) {
+      mat.occlusionTextureIndex =
+          getTextureIndex(gltfMat.occlusionTexture->textureIndex);
+      mat.occlusionStrength = gltfMat.occlusionTexture->strength;
+    }
+
+    sceneAsset.materials.push_back(mat);
+  }
+
+  // Ensure at least one material
+  if (sceneAsset.materials.empty()) {
+    sceneAsset.materials.push_back(MaterialAsset{});
+  }
+
+  // 3. Parse Meshes
+  for (const auto &mesh : asset.meshes) {
+    std::vector<Vertex> vertices;
+    std::vector<core::u32> indices;
+
+    for (const auto &prim : mesh.primitives) {
+      if (prim.type != fastgltf::PrimitiveType::Triangles) {
+        continue;
+      }
+
+      const auto posIt = prim.findAttribute("POSITION");
+      if (posIt == prim.attributes.end()) {
+        continue;
+      }
+
+      const auto baseVertex = static_cast<core::u32>(vertices.size());
+      const auto &posAccessor = asset.accessors[posIt->accessorIndex];
+      const core::usize primVertexCount = posAccessor.count;
+
+      std::vector<Vertex> primVertices(primVertexCount);
+      fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+          asset, posAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+            primVertices[idx].position = core::Vec3(pos.x(), pos.y(), pos.z());
+          });
+
+      const auto normIt = prim.findAttribute("NORMAL");
+      if (normIt != prim.attributes.end()) {
+        const auto &normAccessor = asset.accessors[normIt->accessorIndex];
+        fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+            asset, normAccessor,
+            [&](fastgltf::math::fvec3 norm, std::size_t idx) {
+              primVertices[idx].normal =
+                  core::Vec3(norm.x(), norm.y(), norm.z());
+            });
+      }
+
+      const auto uvIt = prim.findAttribute("TEXCOORD_0");
+      if (uvIt != prim.attributes.end()) {
+        const auto &uvAccessor = asset.accessors[uvIt->accessorIndex];
+        fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
+            asset, uvAccessor, [&](fastgltf::math::fvec2 uv, std::size_t idx) {
+              primVertices[idx].uv = core::Vec2(uv.x(), uv.y());
+            });
+      }
+
+      vertices.insert(vertices.end(), primVertices.begin(), primVertices.end());
+
+      if (prim.indicesAccessor.has_value()) {
+        const auto &indexAccessor =
+            asset.accessors[prim.indicesAccessor.value()];
+        fastgltf::iterateAccessorWithIndex<core::u32>(
+            asset, indexAccessor, [&](core::u32 idx, std::size_t /*i*/) {
+              indices.push_back(baseVertex + idx);
+            });
+      } else {
+        for (core::u32 i = 0; i < static_cast<core::u32>(primVertexCount);
+             ++i) {
+          indices.push_back(baseVertex + i);
+        }
+      }
+    }
+
+    if (!vertices.empty() && !indices.empty()) {
+      sceneAsset.meshes.push_back(
+          buildMeshletsFromGeometry(vertices, indices, options));
+    }
+  }
+
+  // 4. Parse Nodes / Instances from default scene
+  const auto sceneIndex = asset.defaultScene.has_value()
+                              ? asset.defaultScene.value()
+                              : (asset.scenes.empty() ? 0 : 0);
+  if (!asset.scenes.empty() && sceneIndex < asset.scenes.size()) {
+    const auto &scene = asset.scenes[sceneIndex];
+    for (auto nodeIdx : scene.nodeIndices) {
+      traverseNodeHierarchy(asset, nodeIdx, fastgltf::math::fmat4x4(),
+                            sceneAsset.instances);
+    }
+  }
+
+  // If no instances extracted from node hierarchy, create a default instance
+  // per mesh
+  if (sceneAsset.instances.empty()) {
+    for (core::u32 i = 0; i < static_cast<core::u32>(sceneAsset.meshes.size());
+         ++i) {
+      sceneAsset.instances.push_back(GltfMeshInstance{
+          .meshIndex = i,
+          .materialIndex = i < sceneAsset.materials.size() ? i : 0,
+          .transform = core::Mat4::identity(),
+      });
+    }
+  }
+
+  ENGINE_LOG_INFO(
+      "Loaded glTF scene '{}': {} meshes, {} materials, {} textures, "
+      "{} instances",
+      path.string(), sceneAsset.meshes.size(), sceneAsset.materials.size(),
+      sceneAsset.textures.size(), sceneAsset.instances.size());
+
+  return sceneAsset;
 }
 
 MeshAsset createProceduralKnot(core::u32 slices, core::u32 stacks,

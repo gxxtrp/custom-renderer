@@ -8,6 +8,7 @@
 namespace engine::rhi {
 
 class Buffer;
+class Sampler;
 class Texture;
 
 enum class DescriptorType : core::u8 {
@@ -78,6 +79,10 @@ struct TextureBindingInfo {
   ImageLayout layout{ImageLayout::ShaderReadOnlyOptimal};
 };
 
+struct SamplerBindingInfo {
+  const Sampler *sampler{nullptr};
+};
+
 class DescriptorSet {
 public:
   virtual ~DescriptorSet() = default;
@@ -96,6 +101,10 @@ public:
                              const TextureBindingInfo &info) = 0;
   virtual void updateTextures(core::u32 binding, core::u32 firstElement,
                               std::span<const TextureBindingInfo> infos) = 0;
+  virtual void updateSampler(core::u32 binding,
+                             const SamplerBindingInfo &info) = 0;
+  virtual void updateSamplers(core::u32 binding, core::u32 firstElement,
+                              std::span<const SamplerBindingInfo> infos) = 0;
 
 protected:
   DescriptorSet() = default;

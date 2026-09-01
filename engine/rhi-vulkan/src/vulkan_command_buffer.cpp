@@ -309,4 +309,39 @@ void VulkanCommandBuffer::copyBuffer(rhi::Buffer &src, rhi::Buffer &dst,
                   &copyRegion);
 }
 
+void VulkanCommandBuffer::copyBufferToTexture(
+    rhi::Buffer &src, rhi::Texture &dst,
+    std::span<const rhi::BufferTextureCopy> regions) {
+  if (regions.empty()) {
+    return;
+  }
+
+  auto &vkSrc = static_cast<VulkanBuffer &>(src);
+  auto &vkDst = static_cast<VulkanTexture &>(dst);
+
+  std::vector<VkBufferImageCopy> vkRegions;
+  vkRegions.reserve(regions.size());
+
+  for (const auto &r : regions) {
+    VkBufferImageCopy copy{};
+    copy.bufferOffset = r.bufferOffset;
+    copy.bufferRowLength = r.bufferRowLength;
+    copy.bufferImageHeight = r.bufferImageHeight;
+    copy.imageSubresource.aspectMask = toVkImageAspectFlags(vkDst.getFormat());
+    copy.imageSubresource.mipLevel = r.mipLevel;
+    copy.imageSubresource.baseArrayLayer = r.baseArrayLayer;
+    copy.imageSubresource.layerCount = r.layerCount;
+    copy.imageOffset =
+        VkOffset3D{r.imageOffset.x, r.imageOffset.y, r.imageOffset.z};
+    copy.imageExtent = VkExtent3D{r.imageExtent.width, r.imageExtent.height,
+                                  r.imageExtent.depth};
+    vkRegions.push_back(copy);
+  }
+
+  vkCmdCopyBufferToImage(
+      m_commandBuffer, vkSrc.getVkBuffer(), vkDst.getVkImage(),
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      static_cast<core::u32>(vkRegions.size()), vkRegions.data());
+}
+
 } // namespace engine::rhi_vulkan

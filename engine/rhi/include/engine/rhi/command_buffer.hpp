@@ -61,6 +61,17 @@ struct RenderingDesc {
   bool hasDepth{false};
 };
 
+struct BufferTextureCopy {
+  core::usize bufferOffset{0};
+  core::u32 bufferRowLength{0};
+  core::u32 bufferImageHeight{0};
+  core::u32 mipLevel{0};
+  core::u32 baseArrayLayer{0};
+  core::u32 layerCount{1};
+  Offset3D imageOffset{0, 0, 0};
+  Extent3D imageExtent{0, 0, 1};
+};
+
 struct CommandBufferDesc {
   bool isSecondary{false};
 };
@@ -106,6 +117,9 @@ public:
   virtual void copyBuffer(Buffer &src, Buffer &dst, core::usize size,
                           core::usize srcOffset = 0,
                           core::usize dstOffset = 0) = 0;
+  virtual void
+  copyBufferToTexture(Buffer &src, Texture &dst,
+                      std::span<const BufferTextureCopy> regions) = 0;
 
 protected:
   CommandBuffer() = default;

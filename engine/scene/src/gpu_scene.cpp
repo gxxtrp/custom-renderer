@@ -43,6 +43,9 @@ GpuScene::GpuScene() {
   m_instances.reserve(2048);
   m_dirtyInstanceIndices.reserve(2048);
   m_isDirty.reserve(2048);
+  m_materials.reserve(256);
+  m_dirtyMaterialIndices.reserve(256);
+  m_isMaterialDirty.reserve(256);
   m_registeredMeshes.reserve(64);
 }
 
@@ -135,6 +138,67 @@ RegisteredMesh GpuScene::registerMesh(rhi::Device &device,
       reg.meshId, reg.meshletCount, m_totalMeshletCount, reg.vertexCount);
 
   return reg;
+}
+
+core::u32 GpuScene::registerMaterial(const assets::GpuMaterialData &material) {
+  const auto id = static_cast<core::u32>(m_materials.size());
+  m_materials.push_back(material);
+  m_dirtyMaterialIndices.push_back(id);
+  m_isMaterialDirty.push_back(true);
+  m_materialFullReuploadRequired = true;
+  return id;
+}
+
+void GpuScene::setMaterial(core::u32 materialId,
+                           const assets::GpuMaterialData &material) {
+  if (materialId < m_materials.size()) {
+    m_materials[materialId] = material;
+    if (!m_isMaterialDirty[materialId]) {
+      m_isMaterialDirty[materialId] = true;
+      m_dirtyMaterialIndices.push_back(materialId);
+    }
+  }
+}
+
+void GpuScene::ensureMaterialBuffers(rhi::Device &device,
+                                     core::usize requiredCount) {
+  if (requiredCount == 0) {
+    return;
+  }
+
+  if (requiredCount > m_materialBufferCapacity || m_materialBuffer == nullptr) {
+    m_materialBufferCapacity = std::max(requiredCount, core::usize(256));
+    const core::usize bufferSize =
+        m_materialBufferCapacity * sizeof(assets::GpuMaterialData);
+
+    const rhi::BufferDesc gpuDesc{
+        .size = bufferSize,
+        .usage = rhi::BufferUsageFlags::StorageBuffer |
+                 rhi::BufferUsageFlags::TransferDst |
+                 rhi::BufferUsageFlags::ShaderDeviceAddress,
+        .memoryUsage = rhi::MemoryUsage::GpuOnly};
+
+    auto gpuBufRes = device.createBuffer(gpuDesc);
+    if (!gpuBufRes) {
+      ENGINE_LOG_FATAL("Failed to allocate GPU scene material buffer: {}",
+                       gpuBufRes.error());
+    }
+    m_materialBuffer = std::move(gpuBufRes.value());
+
+    const rhi::BufferDesc stagingDesc{
+        .size = bufferSize,
+        .usage = rhi::BufferUsageFlags::TransferSrc,
+        .memoryUsage = rhi::MemoryUsage::CpuToGpu};
+
+    auto stagingBufRes = device.createBuffer(stagingDesc);
+    if (!stagingBufRes) {
+      ENGINE_LOG_FATAL("Failed to allocate material staging buffer: {}",
+                       stagingBufRes.error());
+    }
+    m_materialStagingBuffer = std::move(stagingBufRes.value());
+
+    m_materialFullReuploadRequired = true;
+  }
 }
 
 void GpuScene::extractFromEcs(ecs::World &world) {
@@ -267,57 +331,97 @@ void GpuScene::ensureInstanceBuffers(rhi::Device &device,
 void GpuScene::uploadDelta(rhi::Device &device, rhi::CommandBuffer &cmd) {
   ENGINE_PROFILE_ZONE_NAMED("GpuScene::UploadDelta");
 
-  if (m_instances.empty()) {
-    return;
+  bool didInstanceCopy = false;
+
+  if (!m_instances.empty()) {
+    ensureInstanceBuffers(device, m_instances.size());
+
+    if (m_fullReuploadRequired) {
+      auto mapRes = m_instanceStagingBuffer->map();
+      if (!mapRes) {
+        ENGINE_LOG_ERROR("Failed to map staging buffer for full upload");
+        return;
+      }
+      const core::usize totalBytes =
+          m_instances.size() * sizeof(GpuInstanceData);
+      std::memcpy(mapRes.value(), m_instances.data(), totalBytes);
+      m_instanceStagingBuffer->unmap();
+
+      cmd.copyBuffer(*m_instanceStagingBuffer, *m_instanceBuffer, totalBytes, 0,
+                     0);
+
+      m_dirtyInstanceIndices.clear();
+      m_isDirty.assign(m_instances.size(), false);
+      m_fullReuploadRequired = false;
+      didInstanceCopy = true;
+    } else if (!m_dirtyInstanceIndices.empty()) {
+      auto mapRes = m_instanceStagingBuffer->map();
+      if (!mapRes) {
+        ENGINE_LOG_ERROR("Failed to map staging buffer for delta upload");
+        return;
+      }
+
+      auto *stagingPtr = static_cast<core::u8 *>(mapRes.value());
+
+      // Pack sparse dirty updates into staging buffer
+      for (core::u32 dirtyIdx : m_dirtyInstanceIndices) {
+        const core::usize offset = dirtyIdx * sizeof(GpuInstanceData);
+        std::memcpy(stagingPtr + offset, &m_instances[dirtyIdx],
+                    sizeof(GpuInstanceData));
+        cmd.copyBuffer(*m_instanceStagingBuffer, *m_instanceBuffer,
+                       sizeof(GpuInstanceData), offset, offset);
+        m_isDirty[dirtyIdx] = false;
+      }
+
+      m_instanceStagingBuffer->unmap();
+      m_dirtyInstanceIndices.clear();
+      didInstanceCopy = true;
+    }
   }
 
-  ensureInstanceBuffers(device, m_instances.size());
+  // Upload materials if registered
+  bool didMaterialCopy = false;
+  if (!m_materials.empty()) {
+    ensureMaterialBuffers(device, m_materials.size());
 
-  bool didCopy = false;
+    if (m_materialFullReuploadRequired) {
+      auto mapRes = m_materialStagingBuffer->map();
+      if (mapRes) {
+        const core::usize totalBytes =
+            m_materials.size() * sizeof(assets::GpuMaterialData);
+        std::memcpy(mapRes.value(), m_materials.data(), totalBytes);
+        m_materialStagingBuffer->unmap();
 
-  if (m_fullReuploadRequired) {
-    auto mapRes = m_instanceStagingBuffer->map();
-    if (!mapRes) {
-      ENGINE_LOG_ERROR("Failed to map staging buffer for full upload");
-      return;
+        cmd.copyBuffer(*m_materialStagingBuffer, *m_materialBuffer, totalBytes,
+                       0, 0);
+
+        m_dirtyMaterialIndices.clear();
+        m_isMaterialDirty.assign(m_materials.size(), false);
+        m_materialFullReuploadRequired = false;
+        didMaterialCopy = true;
+      }
+    } else if (!m_dirtyMaterialIndices.empty()) {
+      auto mapRes = m_materialStagingBuffer->map();
+      if (mapRes) {
+        auto *stagingPtr = static_cast<core::u8 *>(mapRes.value());
+        for (core::u32 dirtyIdx : m_dirtyMaterialIndices) {
+          const core::usize offset = dirtyIdx * sizeof(assets::GpuMaterialData);
+          std::memcpy(stagingPtr + offset, &m_materials[dirtyIdx],
+                      sizeof(assets::GpuMaterialData));
+          cmd.copyBuffer(*m_materialStagingBuffer, *m_materialBuffer,
+                         sizeof(assets::GpuMaterialData), offset, offset);
+          m_isMaterialDirty[dirtyIdx] = false;
+        }
+        m_materialStagingBuffer->unmap();
+        m_dirtyMaterialIndices.clear();
+        didMaterialCopy = true;
+      }
     }
-    const core::usize totalBytes = m_instances.size() * sizeof(GpuInstanceData);
-    std::memcpy(mapRes.value(), m_instances.data(), totalBytes);
-    m_instanceStagingBuffer->unmap();
-
-    cmd.copyBuffer(*m_instanceStagingBuffer, *m_instanceBuffer, totalBytes, 0,
-                   0);
-
-    m_dirtyInstanceIndices.clear();
-    m_isDirty.assign(m_instances.size(), false);
-    m_fullReuploadRequired = false;
-    didCopy = true;
-  } else if (!m_dirtyInstanceIndices.empty()) {
-    auto mapRes = m_instanceStagingBuffer->map();
-    if (!mapRes) {
-      ENGINE_LOG_ERROR("Failed to map staging buffer for delta upload");
-      return;
-    }
-
-    auto *stagingPtr = static_cast<core::u8 *>(mapRes.value());
-
-    // Pack sparse dirty updates into staging buffer
-    for (core::u32 dirtyIdx : m_dirtyInstanceIndices) {
-      const core::usize offset = dirtyIdx * sizeof(GpuInstanceData);
-      std::memcpy(stagingPtr + offset, &m_instances[dirtyIdx],
-                  sizeof(GpuInstanceData));
-      cmd.copyBuffer(*m_instanceStagingBuffer, *m_instanceBuffer,
-                     sizeof(GpuInstanceData), offset, offset);
-      m_isDirty[dirtyIdx] = false;
-    }
-
-    m_instanceStagingBuffer->unmap();
-    m_dirtyInstanceIndices.clear();
-    didCopy = true;
   }
 
-  if (didCopy) {
-    const rhi::BufferBarrier copyBarrier{
+  std::vector<rhi::BufferBarrier> barriers;
+  if (didInstanceCopy && m_instanceBuffer) {
+    barriers.push_back(rhi::BufferBarrier{
         .buffer = m_instanceBuffer.get(),
         .offset = 0,
         .size = 0,
@@ -327,9 +431,24 @@ void GpuScene::uploadDelta(rhi::Device &device, rhi::CommandBuffer &cmd) {
         .dstStage = rhi::PipelineStageFlags::ComputeShader |
                     rhi::PipelineStageFlags::TaskShader |
                     rhi::PipelineStageFlags::MeshShader |
-                    rhi::PipelineStageFlags::FragmentShader};
+                    rhi::PipelineStageFlags::FragmentShader});
+  }
+  if (didMaterialCopy && m_materialBuffer) {
+    barriers.push_back(rhi::BufferBarrier{
+        .buffer = m_materialBuffer.get(),
+        .offset = 0,
+        .size = 0,
+        .srcAccess = rhi::AccessFlags::TransferWrite,
+        .dstAccess = rhi::AccessFlags::ShaderRead,
+        .srcStage = rhi::PipelineStageFlags::Transfer,
+        .dstStage = rhi::PipelineStageFlags::ComputeShader |
+                    rhi::PipelineStageFlags::FragmentShader});
+  }
+
+  if (!barriers.empty()) {
     const rhi::PipelineBarrierDesc barrierDesc{
-        .bufferBarriers = {&copyBarrier, 1}};
+        .bufferBarriers = barriers,
+    };
     cmd.pipelineBarrier(barrierDesc);
   }
 }
