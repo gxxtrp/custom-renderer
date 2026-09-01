@@ -7,6 +7,7 @@
 #include <engine/rhi/device.hpp>
 #include <engine/rhi/enums.hpp>
 #include <engine/rhi/pipeline.hpp>
+#include <engine/rhi/shader.hpp>
 #include <engine/rhi/swapchain.hpp>
 #include <engine/rhi/sync.hpp>
 #include <engine/rhi/texture.hpp>
