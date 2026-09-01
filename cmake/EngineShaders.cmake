@@ -6,7 +6,7 @@ include(CMakeParseArguments)
 function(engine_target_shaders TARGET_NAME)
     find_package(Slang REQUIRED)
 
-    set(SHADER_OUT_DIR "${CMAKE_BINARY_DIR}/shaders")
+    set(SHADER_OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
     file(MAKE_DIRECTORY "${SHADER_OUT_DIR}")
 
     set(COMPILED_SPV_FILES)

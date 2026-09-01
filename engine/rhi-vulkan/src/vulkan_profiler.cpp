@@ -2,4 +2,4 @@
 
 namespace engine::rhi_vulkan {
 // Vulkan profiler translation unit
-}  // namespace engine::rhi_vulkan
+} // namespace engine::rhi_vulkan
