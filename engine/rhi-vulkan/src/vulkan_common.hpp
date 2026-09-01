@@ -41,5 +41,7 @@ toVkPipelineStageFlags2(rhi::PipelineStageFlags stage) noexcept;
 [[nodiscard]] VkPresentModeKHR toVkPresentMode(rhi::PresentMode mode) noexcept;
 [[nodiscard]] rhi::PresentMode
 fromVkPresentMode(VkPresentModeKHR mode) noexcept;
+[[nodiscard]] VkShaderStageFlags
+toVkShaderStageFlags(rhi::PipelineStageFlags stages) noexcept;
 
 } // namespace engine::rhi_vulkan

@@ -90,6 +90,8 @@ public:
 
   virtual void bindPipeline(Pipeline &pipeline) = 0;
   virtual void bindDescriptorSet(DescriptorSet &set, core::u32 setIndex) = 0;
+  virtual void pushConstants(PipelineStageFlags stages, core::u32 offset,
+                             core::u32 size, const void *data) = 0;
   virtual void drawMeshTasks(core::u32 groupCountX, core::u32 groupCountY,
                              core::u32 groupCountZ) = 0;
   virtual void copyBuffer(Buffer &src, Buffer &dst, core::usize size,

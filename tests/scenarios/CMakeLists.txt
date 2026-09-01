@@ -1,3 +1,4 @@
 add_subdirectory(m1_window)
 add_subdirectory(m2_clear_screen)
 add_subdirectory(m3_mesh_shader_triangle)
+add_subdirectory(m4_vis_buffer_mesh)
