@@ -55,6 +55,8 @@ endif()
 find_package(SDL3 REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(Tracy REQUIRED)
+find_package(fastgltf REQUIRED)
+find_package(meshoptimizer REQUIRED)
 
 # Subdirectories
 add_subdirectory(engine)

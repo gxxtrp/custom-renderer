@@ -445,4 +445,35 @@ rhi::PresentMode fromVkPresentMode(VkPresentModeKHR mode) noexcept {
   }
 }
 
+VkShaderStageFlags
+toVkShaderStageFlags(rhi::PipelineStageFlags stages) noexcept {
+  VkShaderStageFlags flags = 0;
+  const auto u = static_cast<core::u32>(stages);
+  if ((u & static_cast<core::u32>(rhi::PipelineStageFlags::VertexShader)) !=
+      0) {
+    flags |= VK_SHADER_STAGE_VERTEX_BIT;
+  }
+  if ((u & static_cast<core::u32>(rhi::PipelineStageFlags::MeshShader)) != 0) {
+    flags |= VK_SHADER_STAGE_MESH_BIT_EXT;
+  }
+  if ((u & static_cast<core::u32>(rhi::PipelineStageFlags::TaskShader)) != 0) {
+    flags |= VK_SHADER_STAGE_TASK_BIT_EXT;
+  }
+  if ((u & static_cast<core::u32>(rhi::PipelineStageFlags::FragmentShader)) !=
+      0) {
+    flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+  }
+  if ((u & static_cast<core::u32>(rhi::PipelineStageFlags::ComputeShader)) !=
+      0) {
+    flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+  }
+  if ((u & static_cast<core::u32>(rhi::PipelineStageFlags::AllGraphics)) != 0) {
+    flags |= VK_SHADER_STAGE_ALL_GRAPHICS;
+  }
+  if ((u & static_cast<core::u32>(rhi::PipelineStageFlags::AllCommands)) != 0) {
+    flags |= VK_SHADER_STAGE_ALL;
+  }
+  return flags ? flags : VK_SHADER_STAGE_ALL;
+}
+
 } // namespace engine::rhi_vulkan

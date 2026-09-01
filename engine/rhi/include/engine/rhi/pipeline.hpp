@@ -16,54 +16,67 @@ enum class FrontFace : core::u8 { CounterClockwise = 0, Clockwise };
 
 enum class PolygonMode : core::u8 { Fill = 0, Line, Point };
 
-enum class CompareOp : core::u8 { Never = 0, Less, Equal, LessOrEqual, Greater, NotEqual, GreaterOrEqual, Always };
+enum class CompareOp : core::u8 {
+  Never = 0,
+  Less,
+  Equal,
+  LessOrEqual,
+  Greater,
+  NotEqual,
+  GreaterOrEqual,
+  Always
+};
 
 struct RasterizerState {
-    core::f32 lineWidth{1.0f};
-    PolygonMode polygonMode{PolygonMode::Fill};
-    CullMode cullMode{CullMode::Back};
-    FrontFace frontFace{FrontFace::CounterClockwise};
-    bool depthClampEnable{false};
+  core::f32 lineWidth{1.0f};
+  PolygonMode polygonMode{PolygonMode::Fill};
+  CullMode cullMode{CullMode::Back};
+  FrontFace frontFace{FrontFace::CounterClockwise};
+  bool depthClampEnable{false};
 };
 
 struct DepthStencilState {
-    CompareOp depthCompareOp{CompareOp::LessOrEqual};
-    bool depthTestEnable{true};
-    bool depthWriteEnable{true};
+  CompareOp depthCompareOp{CompareOp::LessOrEqual};
+  bool depthTestEnable{true};
+  bool depthWriteEnable{true};
 };
 
 struct ColorBlendAttachment {
-    Format format{Format::RGBA8_UNORM};
-    bool blendEnable{false};
+  Format format{Format::RGBA8_UNORM};
+  bool blendEnable{false};
 };
 
-struct PipelineDesc {
-    std::span<const core::u8> taskShaderCode{};
-    std::span<const core::u8> meshShaderCode{};
-    std::span<const core::u8> fragmentShaderCode{};
-    std::span<const core::u8> computeShaderCode{};
-    std::span<const Format> colorAttachmentFormats{};
+class DescriptorSet;
 
-    RasterizerState rasterizer{};
-    DepthStencilState depthStencil{};
-    Format depthAttachmentFormat{Format::Undefined};
-    PipelineBindPoint bindPoint{PipelineBindPoint::Graphics};
+struct PipelineDesc {
+  std::span<const core::u8> taskShaderCode{};
+  std::span<const core::u8> meshShaderCode{};
+  std::span<const core::u8> fragmentShaderCode{};
+  std::span<const core::u8> computeShaderCode{};
+  std::span<const Format> colorAttachmentFormats{};
+
+  RasterizerState rasterizer{};
+  DepthStencilState depthStencil{};
+  Format depthAttachmentFormat{Format::Undefined};
+  PipelineBindPoint bindPoint{PipelineBindPoint::Graphics};
+
+  std::span<const DescriptorSet *const> descriptorSets{};
 };
 
 class Pipeline {
 public:
-    virtual ~Pipeline() = default;
+  virtual ~Pipeline() = default;
 
-    Pipeline(const Pipeline&) = delete;
-    Pipeline& operator=(const Pipeline&) = delete;
+  Pipeline(const Pipeline &) = delete;
+  Pipeline &operator=(const Pipeline &) = delete;
 
-    Pipeline(Pipeline&&) noexcept = default;
-    Pipeline& operator=(Pipeline&&) noexcept = default;
+  Pipeline(Pipeline &&) noexcept = default;
+  Pipeline &operator=(Pipeline &&) noexcept = default;
 
-    [[nodiscard]] virtual PipelineBindPoint getBindPoint() const noexcept = 0;
+  [[nodiscard]] virtual PipelineBindPoint getBindPoint() const noexcept = 0;
 
 protected:
-    Pipeline() = default;
+  Pipeline() = default;
 };
 
-}  // namespace engine::rhi
+} // namespace engine::rhi

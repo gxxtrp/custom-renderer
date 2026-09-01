@@ -212,6 +212,7 @@ void VulkanCommandBuffer::setScissor(const rhi::Rect2D &scissor) {
 
 void VulkanCommandBuffer::bindPipeline(rhi::Pipeline &pipeline) {
   auto &vkPipeline = static_cast<VulkanPipeline &>(pipeline);
+  m_currentPipeline = &vkPipeline;
   const VkPipelineBindPoint bp =
       (pipeline.getBindPoint() == rhi::PipelineBindPoint::Compute)
           ? VK_PIPELINE_BIND_POINT_COMPUTE
@@ -223,9 +224,27 @@ void VulkanCommandBuffer::bindDescriptorSet(rhi::DescriptorSet &set,
                                             core::u32 setIndex) {
   auto &vkSet = static_cast<VulkanDescriptorSet &>(set);
   VkDescriptorSet ds = vkSet.getVkDescriptorSet();
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          vkSet.getVkPipelineLayout(), setIndex, 1, &ds, 0,
+  const VkPipelineBindPoint bp =
+      (m_currentPipeline &&
+       m_currentPipeline->getBindPoint() == rhi::PipelineBindPoint::Compute)
+          ? VK_PIPELINE_BIND_POINT_COMPUTE
+          : VK_PIPELINE_BIND_POINT_GRAPHICS;
+  const VkPipelineLayout layout = m_currentPipeline
+                                      ? m_currentPipeline->getVkPipelineLayout()
+                                      : vkSet.getVkPipelineLayout();
+  vkCmdBindDescriptorSets(m_commandBuffer, bp, layout, setIndex, 1, &ds, 0,
                           nullptr);
+}
+
+void VulkanCommandBuffer::pushConstants(rhi::PipelineStageFlags stages,
+                                        core::u32 offset, core::u32 size,
+                                        const void *data) {
+  if (m_currentPipeline == nullptr || data == nullptr || size == 0) {
+    return;
+  }
+  (void)stages;
+  vkCmdPushConstants(m_commandBuffer, m_currentPipeline->getVkPipelineLayout(),
+                     VK_SHADER_STAGE_ALL, offset, size, data);
 }
 
 void VulkanCommandBuffer::drawMeshTasks(core::u32 groupCountX,

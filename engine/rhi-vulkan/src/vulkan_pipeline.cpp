@@ -3,6 +3,8 @@
 #include <utility>
 #include <vector>
 
+#include "vulkan_descriptor_set.hpp"
+
 namespace engine::rhi_vulkan {
 
 namespace {
@@ -91,15 +93,24 @@ VkShaderModule createShaderModule(VkDevice device,
 
 std::expected<std::unique_ptr<VulkanPipeline>, std::string>
 VulkanPipeline::create(VkDevice device, const rhi::PipelineDesc &desc) {
-  // Create empty pipeline layout (can be expanded with descriptor set
-  // layouts/push constants)
+  std::vector<VkDescriptorSetLayout> setLayouts;
+  setLayouts.reserve(desc.descriptorSets.size());
+  for (const auto *ds : desc.descriptorSets) {
+    if (ds != nullptr) {
+      const auto &vkDs = static_cast<const VulkanDescriptorSet &>(*ds);
+      setLayouts.push_back(vkDs.getVkDescriptorSetLayout());
+    }
+  }
+
   VkPipelineLayoutCreateInfo layoutInfo{};
   layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  layoutInfo.setLayoutCount = static_cast<core::u32>(setLayouts.size());
+  layoutInfo.pSetLayouts = setLayouts.empty() ? nullptr : setLayouts.data();
 
   VkPushConstantRange pushConstantRange{};
   pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL;
   pushConstantRange.offset = 0;
-  pushConstantRange.size = 128; // 128 bytes standard push constants
+  pushConstantRange.size = 256; // 256 bytes push constants
   layoutInfo.pushConstantRangeCount = 1;
   layoutInfo.pPushConstantRanges = &pushConstantRange;
 
