@@ -78,9 +78,8 @@ public:
 
 private:
   struct VirtualTexture {
-    RGTextureDesc desc{};
     rhi::Texture *physicalTexture{nullptr};
-    bool isImported{false};
+    RGTextureDesc desc{};
     rhi::ImageLayout initialLayout{rhi::ImageLayout::Undefined};
     rhi::ImageLayout finalLayout{rhi::ImageLayout::Undefined};
     rhi::ImageLayout currentLayout{rhi::ImageLayout::Undefined};
@@ -89,32 +88,32 @@ private:
     core::u32 firstPass{~0u};
     core::u32 lastPass{~0u};
     core::u32 writtenByPass{~0u};
+    bool isImported{false};
   };
 
   struct VirtualBuffer {
-    RGBufferDesc desc{};
     rhi::Buffer *physicalBuffer{nullptr};
-    bool isImported{false};
+    RGBufferDesc desc{};
     rhi::PipelineStageFlags currentStage{rhi::PipelineStageFlags::None};
     rhi::AccessFlags currentAccess{rhi::AccessFlags::None};
     core::u32 firstPass{~0u};
     core::u32 lastPass{~0u};
     core::u32 writtenByPass{~0u};
+    bool isImported{false};
   };
 
   struct PassNode {
+    RGPassExecuteCallback executeCallback{};
     std::string name{};
-    RGPassType type{RGPassType::Graphics};
     std::vector<RGTextureAccess> textureAccesses{};
     std::vector<RGBufferAccess> bufferAccesses{};
     std::vector<RGColorAttachmentInfo> colorAttachments{};
-    std::optional<RGDepthAttachmentInfo> depthAttachment{};
-    RGPassExecuteCallback executeCallback{};
-    bool isSideEffect{false};
-    bool isCulled{false};
-
     std::vector<rhi::ImageBarrier> imageBarriers{};
     std::vector<rhi::BufferBarrier> bufferBarriers{};
+    std::optional<RGDepthAttachmentInfo> depthAttachment{};
+    RGPassType type{RGPassType::Graphics};
+    bool isSideEffect{false};
+    bool isCulled{false};
   };
 
   TransientResourcePool m_internalPool{};
@@ -125,6 +124,10 @@ private:
   std::vector<PassNode> m_passes;
   std::vector<core::u32> m_executionOrder;
   std::vector<rhi::ImageBarrier> m_postImageBarriers;
+
+  core::u32 m_activeTextureCount{0};
+  core::u32 m_activeBufferCount{0};
+  core::u32 m_activePassCount{0};
   bool m_isCompiled{false};
 };
 

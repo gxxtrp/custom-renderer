@@ -12,10 +12,10 @@ RGTextureHandle RenderPassBuilder::read(RGTextureHandle handle,
                                         rhi::PipelineStageFlags stage,
                                         rhi::AccessFlags access,
                                         rhi::ImageLayout layout) {
-  m_graph.addTextureAccess(m_passIndex, RGTextureAccess{.handle = handle,
-                                                        .stage = stage,
+  m_graph.addTextureAccess(m_passIndex, RGTextureAccess{.stage = stage,
                                                         .access = access,
                                                         .layout = layout,
+                                                        .handle = handle,
                                                         .isWrite = false});
   return handle;
 }
@@ -24,10 +24,10 @@ RGTextureHandle RenderPassBuilder::write(RGTextureHandle handle,
                                          rhi::PipelineStageFlags stage,
                                          rhi::AccessFlags access,
                                          rhi::ImageLayout layout) {
-  m_graph.addTextureAccess(m_passIndex, RGTextureAccess{.handle = handle,
-                                                        .stage = stage,
+  m_graph.addTextureAccess(m_passIndex, RGTextureAccess{.stage = stage,
                                                         .access = access,
                                                         .layout = layout,
+                                                        .handle = handle,
                                                         .isWrite = true});
   return handle;
 }
@@ -35,9 +35,9 @@ RGTextureHandle RenderPassBuilder::write(RGTextureHandle handle,
 RGBufferHandle RenderPassBuilder::read(RGBufferHandle handle,
                                        rhi::PipelineStageFlags stage,
                                        rhi::AccessFlags access) {
-  m_graph.addBufferAccess(m_passIndex, RGBufferAccess{.handle = handle,
-                                                      .stage = stage,
+  m_graph.addBufferAccess(m_passIndex, RGBufferAccess{.stage = stage,
                                                       .access = access,
+                                                      .handle = handle,
                                                       .isWrite = false});
   return handle;
 }
@@ -45,9 +45,9 @@ RGBufferHandle RenderPassBuilder::read(RGBufferHandle handle,
 RGBufferHandle RenderPassBuilder::write(RGBufferHandle handle,
                                         rhi::PipelineStageFlags stage,
                                         rhi::AccessFlags access) {
-  m_graph.addBufferAccess(m_passIndex, RGBufferAccess{.handle = handle,
-                                                      .stage = stage,
+  m_graph.addBufferAccess(m_passIndex, RGBufferAccess{.stage = stage,
                                                       .access = access,
+                                                      .handle = handle,
                                                       .isWrite = true});
   return handle;
 }
@@ -58,8 +58,8 @@ RGTextureHandle RenderPassBuilder::addColorAttachment(
         rhi::AccessFlags::ColorAttachmentWrite,
         rhi::ImageLayout::ColorAttachmentOptimal);
   m_graph.addColorAttachment(m_passIndex,
-                             RGColorAttachmentInfo{.handle = handle,
-                                                   .clearValue = clearValue,
+                             RGColorAttachmentInfo{.clearValue = clearValue,
+                                                   .handle = handle,
                                                    .clearOnLoad = clearOnLoad});
   return handle;
 }
@@ -75,8 +75,8 @@ RenderPassBuilder::setDepthAttachment(RGTextureHandle handle,
             rhi::AccessFlags::DepthStencilAttachmentWrite,
         rhi::ImageLayout::DepthStencilAttachmentOptimal);
   m_graph.setDepthAttachment(m_passIndex,
-                             RGDepthAttachmentInfo{.handle = handle,
-                                                   .clearValue = clearValue,
+                             RGDepthAttachmentInfo{.clearValue = clearValue,
+                                                   .handle = handle,
                                                    .clearOnLoad = clearOnLoad});
   return handle;
 }

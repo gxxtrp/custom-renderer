@@ -29,21 +29,39 @@ RenderGraph::RenderGraph(TransientResourcePool &externalPool)
 RenderGraph::~RenderGraph() = default;
 
 RGTextureHandle RenderGraph::createTexture(const RGTextureDesc &desc) {
-  const auto id = static_cast<core::u32>(m_textures.size());
-  auto &vTex = m_textures.emplace_back();
+  const auto id = m_activeTextureCount++;
+  if (id >= m_textures.size()) {
+    m_textures.emplace_back();
+  }
+  auto &vTex = m_textures[id];
   vTex.desc = desc;
+  vTex.physicalTexture = nullptr;
   vTex.isImported = false;
   vTex.initialLayout = rhi::ImageLayout::Undefined;
   vTex.currentLayout = rhi::ImageLayout::Undefined;
   vTex.finalLayout = rhi::ImageLayout::Undefined;
+  vTex.currentStage = rhi::PipelineStageFlags::None;
+  vTex.currentAccess = rhi::AccessFlags::None;
+  vTex.firstPass = ~0u;
+  vTex.lastPass = ~0u;
+  vTex.writtenByPass = ~0u;
   return RGTextureHandle{id};
 }
 
 RGBufferHandle RenderGraph::createBuffer(const RGBufferDesc &desc) {
-  const auto id = static_cast<core::u32>(m_buffers.size());
-  auto &vBuf = m_buffers.emplace_back();
+  const auto id = m_activeBufferCount++;
+  if (id >= m_buffers.size()) {
+    m_buffers.emplace_back();
+  }
+  auto &vBuf = m_buffers[id];
   vBuf.desc = desc;
+  vBuf.physicalBuffer = nullptr;
   vBuf.isImported = false;
+  vBuf.currentStage = rhi::PipelineStageFlags::None;
+  vBuf.currentAccess = rhi::AccessFlags::None;
+  vBuf.firstPass = ~0u;
+  vBuf.lastPass = ~0u;
+  vBuf.writtenByPass = ~0u;
   return RGBufferHandle{id};
 }
 
@@ -51,8 +69,11 @@ RGTextureHandle RenderGraph::importTexture(std::string_view name,
                                            rhi::Texture *texture,
                                            rhi::ImageLayout initialLayout,
                                            rhi::ImageLayout finalLayout) {
-  const auto id = static_cast<core::u32>(m_textures.size());
-  auto &vTex = m_textures.emplace_back();
+  const auto id = m_activeTextureCount++;
+  if (id >= m_textures.size()) {
+    m_textures.emplace_back();
+  }
+  auto &vTex = m_textures[id];
   vTex.desc.name = std::string(name);
   if (texture != nullptr) {
     vTex.desc.width = texture->getWidth();
@@ -69,13 +90,21 @@ RGTextureHandle RenderGraph::importTexture(std::string_view name,
   vTex.initialLayout = initialLayout;
   vTex.currentLayout = initialLayout;
   vTex.finalLayout = finalLayout;
+  vTex.currentStage = rhi::PipelineStageFlags::None;
+  vTex.currentAccess = rhi::AccessFlags::None;
+  vTex.firstPass = ~0u;
+  vTex.lastPass = ~0u;
+  vTex.writtenByPass = ~0u;
   return RGTextureHandle{id};
 }
 
 RGBufferHandle RenderGraph::importBuffer(std::string_view name,
                                          rhi::Buffer *buffer) {
-  const auto id = static_cast<core::u32>(m_buffers.size());
-  auto &vBuf = m_buffers.emplace_back();
+  const auto id = m_activeBufferCount++;
+  if (id >= m_buffers.size()) {
+    m_buffers.emplace_back();
+  }
+  auto &vBuf = m_buffers[id];
   vBuf.desc.name = std::string(name);
   if (buffer != nullptr) {
     vBuf.desc.size = buffer->getSize();
@@ -84,16 +113,32 @@ RGBufferHandle RenderGraph::importBuffer(std::string_view name,
   }
   vBuf.physicalBuffer = buffer;
   vBuf.isImported = true;
+  vBuf.currentStage = rhi::PipelineStageFlags::None;
+  vBuf.currentAccess = rhi::AccessFlags::None;
+  vBuf.firstPass = ~0u;
+  vBuf.lastPass = ~0u;
+  vBuf.writtenByPass = ~0u;
   return RGBufferHandle{id};
 }
 
 void RenderGraph::addPass(std::string_view name, RGPassType type,
                           RGPassSetupCallback setup,
                           RGPassExecuteCallback execute) {
-  const auto passIndex = static_cast<core::u32>(m_passes.size());
-  auto &pass = m_passes.emplace_back();
+  const auto passIndex = m_activePassCount++;
+  if (passIndex >= m_passes.size()) {
+    m_passes.emplace_back();
+  }
+  auto &pass = m_passes[passIndex];
   pass.name = std::string(name);
   pass.type = type;
+  pass.textureAccesses.clear();
+  pass.bufferAccesses.clear();
+  pass.colorAttachments.clear();
+  pass.depthAttachment.reset();
+  pass.imageBarriers.clear();
+  pass.bufferBarriers.clear();
+  pass.isSideEffect = false;
+  pass.isCulled = false;
   pass.executeCallback = std::move(execute);
 
   RenderPassBuilder builder(*this, passIndex);
@@ -104,8 +149,8 @@ void RenderGraph::addPass(std::string_view name, RGPassType type,
 
 void RenderGraph::addTextureAccess(core::u32 passIndex,
                                    const RGTextureAccess &access) {
-  if (passIndex < m_passes.size() && access.handle.isValid() &&
-      access.handle.id < m_textures.size()) {
+  if (passIndex < m_activePassCount && access.handle.isValid() &&
+      access.handle.id < m_activeTextureCount) {
     m_passes[passIndex].textureAccesses.push_back(access);
     if (access.isWrite) {
       m_textures[access.handle.id].writtenByPass = passIndex;
@@ -118,8 +163,8 @@ void RenderGraph::addTextureAccess(core::u32 passIndex,
 
 void RenderGraph::addBufferAccess(core::u32 passIndex,
                                   const RGBufferAccess &access) {
-  if (passIndex < m_passes.size() && access.handle.isValid() &&
-      access.handle.id < m_buffers.size()) {
+  if (passIndex < m_activePassCount && access.handle.isValid() &&
+      access.handle.id < m_activeBufferCount) {
     m_passes[passIndex].bufferAccesses.push_back(access);
     if (access.isWrite) {
       m_buffers[access.handle.id].writtenByPass = passIndex;
@@ -132,28 +177,28 @@ void RenderGraph::addBufferAccess(core::u32 passIndex,
 
 void RenderGraph::addColorAttachment(core::u32 passIndex,
                                      const RGColorAttachmentInfo &info) {
-  if (passIndex < m_passes.size()) {
+  if (passIndex < m_activePassCount) {
     m_passes[passIndex].colorAttachments.push_back(info);
   }
 }
 
 void RenderGraph::setDepthAttachment(core::u32 passIndex,
                                      const RGDepthAttachmentInfo &info) {
-  if (passIndex < m_passes.size()) {
+  if (passIndex < m_activePassCount) {
     m_passes[passIndex].depthAttachment = info;
   }
 }
 
 void RenderGraph::setPassSideEffect(core::u32 passIndex,
                                     bool sideEffect) noexcept {
-  if (passIndex < m_passes.size()) {
+  if (passIndex < m_activePassCount) {
     m_passes[passIndex].isSideEffect = sideEffect;
   }
 }
 
 void RenderGraph::compile() {
   // Compile without device: computes DAG, culls passes, sorts topologically
-  const auto numPasses = static_cast<core::u32>(m_passes.size());
+  const auto numPasses = m_activePassCount;
   if (numPasses == 0) {
     m_isCompiled = true;
     return;
@@ -319,14 +364,16 @@ void RenderGraph::compile(rhi::Device &device) {
   compile();
 
   // 4. Physical Resource Allocation
-  for (auto &vTex : m_textures) {
+  for (core::u32 i = 0; i < m_activeTextureCount; ++i) {
+    auto &vTex = m_textures[i];
     if (!vTex.isImported && vTex.physicalTexture == nullptr &&
         vTex.firstPass != core::u32(~0u)) {
       vTex.physicalTexture = m_pool->acquireTexture(device, vTex.desc);
     }
   }
 
-  for (auto &vBuf : m_buffers) {
+  for (core::u32 i = 0; i < m_activeBufferCount; ++i) {
+    auto &vBuf = m_buffers[i];
     if (!vBuf.isImported && vBuf.physicalBuffer == nullptr &&
         vBuf.firstPass != core::u32(~0u)) {
       vBuf.physicalBuffer = m_pool->acquireBuffer(device, vBuf.desc);
@@ -401,7 +448,8 @@ void RenderGraph::compile(rhi::Device &device) {
 
   // 6. Post-Graph Transitions (e.g. swapchain image to PresentSrc)
   m_postImageBarriers.clear();
-  for (auto &vTex : m_textures) {
+  for (core::u32 i = 0; i < m_activeTextureCount; ++i) {
+    auto &vTex = m_textures[i];
     if (vTex.isImported && vTex.finalLayout != rhi::ImageLayout::Undefined &&
         vTex.currentLayout != vTex.finalLayout &&
         vTex.physicalTexture != nullptr) {
@@ -514,9 +562,21 @@ void RenderGraph::execute(rhi::Device &device, rhi::CommandBuffer &cmd) {
 
 void RenderGraph::reset() noexcept {
   m_pool->reset();
-  m_textures.clear();
-  m_buffers.clear();
-  m_passes.clear();
+  for (core::u32 i = 0; i < m_activePassCount; ++i) {
+    auto &pass = m_passes[i];
+    pass.textureAccesses.clear();
+    pass.bufferAccesses.clear();
+    pass.colorAttachments.clear();
+    pass.depthAttachment.reset();
+    pass.imageBarriers.clear();
+    pass.bufferBarriers.clear();
+    pass.executeCallback = nullptr;
+    pass.isSideEffect = false;
+    pass.isCulled = false;
+  }
+  m_activeTextureCount = 0;
+  m_activeBufferCount = 0;
+  m_activePassCount = 0;
   m_executionOrder.clear();
   m_postImageBarriers.clear();
   m_isCompiled = false;
@@ -524,7 +584,7 @@ void RenderGraph::reset() noexcept {
 
 rhi::Texture *
 RenderGraph::getPhysicalTexture(RGTextureHandle handle) const noexcept {
-  if (handle.isValid() && handle.id < m_textures.size()) {
+  if (handle.isValid() && handle.id < m_activeTextureCount) {
     return m_textures[handle.id].physicalTexture;
   }
   return nullptr;
@@ -532,7 +592,7 @@ RenderGraph::getPhysicalTexture(RGTextureHandle handle) const noexcept {
 
 rhi::Buffer *
 RenderGraph::getPhysicalBuffer(RGBufferHandle handle) const noexcept {
-  if (handle.isValid() && handle.id < m_buffers.size()) {
+  if (handle.isValid() && handle.id < m_activeBufferCount) {
     return m_buffers[handle.id].physicalBuffer;
   }
   return nullptr;
@@ -540,7 +600,7 @@ RenderGraph::getPhysicalBuffer(RGBufferHandle handle) const noexcept {
 
 const RGTextureDesc *
 RenderGraph::getTextureDesc(RGTextureHandle handle) const noexcept {
-  if (handle.isValid() && handle.id < m_textures.size()) {
+  if (handle.isValid() && handle.id < m_activeTextureCount) {
     return &m_textures[handle.id].desc;
   }
   return nullptr;
@@ -548,7 +608,7 @@ RenderGraph::getTextureDesc(RGTextureHandle handle) const noexcept {
 
 const RGBufferDesc *
 RenderGraph::getBufferDesc(RGBufferHandle handle) const noexcept {
-  if (handle.isValid() && handle.id < m_buffers.size()) {
+  if (handle.isValid() && handle.id < m_activeBufferCount) {
     return &m_buffers[handle.id].desc;
   }
   return nullptr;

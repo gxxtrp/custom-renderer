@@ -61,29 +61,29 @@ struct RGBufferDesc {
 };
 
 struct RGColorAttachmentInfo {
-  RGTextureHandle handle{RGTextureHandle::invalid()};
   rhi::ColorClearValue clearValue{};
+  RGTextureHandle handle{RGTextureHandle::invalid()};
   bool clearOnLoad{true};
 };
 
 struct RGDepthAttachmentInfo {
+  rhi::DepthStencilClearValue clearValue{.depth = 0.0f, .stencil = 0};
   RGTextureHandle handle{RGTextureHandle::invalid()};
-  rhi::DepthStencilClearValue clearValue{0.0f, 0};
   bool clearOnLoad{true};
 };
 
 struct RGTextureAccess {
-  RGTextureHandle handle{RGTextureHandle::invalid()};
   rhi::PipelineStageFlags stage{rhi::PipelineStageFlags::None};
   rhi::AccessFlags access{rhi::AccessFlags::None};
   rhi::ImageLayout layout{rhi::ImageLayout::Undefined};
+  RGTextureHandle handle{RGTextureHandle::invalid()};
   bool isWrite{false};
 };
 
 struct RGBufferAccess {
-  RGBufferHandle handle{RGBufferHandle::invalid()};
   rhi::PipelineStageFlags stage{rhi::PipelineStageFlags::None};
   rhi::AccessFlags access{rhi::AccessFlags::None};
+  RGBufferHandle handle{RGBufferHandle::invalid()};
   bool isWrite{false};
 };
 
