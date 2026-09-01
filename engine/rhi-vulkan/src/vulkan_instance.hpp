@@ -9,35 +9,30 @@
 namespace engine::rhi_vulkan {
 
 struct VulkanInstanceDesc {
-  bool enableValidation{false};
+    bool enableValidation{false};
 };
 
 class VulkanInstance {
 public:
-  static std::expected<VulkanInstance, std::string>
-  create(const VulkanInstanceDesc &desc);
+    static std::expected<VulkanInstance, std::string> create(const VulkanInstanceDesc& desc);
 
-  ~VulkanInstance();
+    ~VulkanInstance();
 
-  VulkanInstance(const VulkanInstance &) = delete;
-  VulkanInstance &operator=(const VulkanInstance &) = delete;
+    VulkanInstance(const VulkanInstance&) = delete;
+    VulkanInstance& operator=(const VulkanInstance&) = delete;
 
-  VulkanInstance(VulkanInstance &&other) noexcept;
-  VulkanInstance &operator=(VulkanInstance &&other) noexcept;
+    VulkanInstance(VulkanInstance&& other) noexcept;
+    VulkanInstance& operator=(VulkanInstance&& other) noexcept;
 
-  [[nodiscard]] VkInstance getInstance() const noexcept { return m_instance; }
-  [[nodiscard]] bool isValidationEnabled() const noexcept {
-    return m_validationEnabled;
-  }
+    [[nodiscard]] VkInstance getInstance() const noexcept { return m_instance; }
+    [[nodiscard]] bool isValidationEnabled() const noexcept { return m_validationEnabled; }
 
 private:
-  explicit VulkanInstance(VkInstance instance,
-                          VkDebugUtilsMessengerEXT debugMessenger,
-                          bool validationEnabled);
+    explicit VulkanInstance(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, bool validationEnabled);
 
-  VkInstance m_instance{VK_NULL_HANDLE};
-  VkDebugUtilsMessengerEXT m_debugMessenger{VK_NULL_HANDLE};
-  bool m_validationEnabled{false};
+    VkInstance m_instance{VK_NULL_HANDLE};
+    VkDebugUtilsMessengerEXT m_debugMessenger{VK_NULL_HANDLE};
+    bool m_validationEnabled{false};
 };
 
-} // namespace engine::rhi_vulkan
+}  // namespace engine::rhi_vulkan
