@@ -1,1 +1,2 @@
 add_subdirectory(m1_window)
+add_subdirectory(m2_clear_screen)
