@@ -53,7 +53,7 @@ public:
     const core::f32 tanHalfFov = std::tan(fovY * 0.5f);
     core::Mat4 m = core::Mat4::zeros();
     m.columns[0].x = 1.0f / (aspect * tanHalfFov);
-    m.columns[1].y = 1.0f / tanHalfFov;
+    m.columns[1].y = -1.0f / tanHalfFov; // Negated for Vulkan NDC (+Y is down)
     m.columns[2].z = zNear / (zNear - zFar);
     m.columns[2].w = -1.0f;
     m.columns[3].z = (zNear * zFar) / (zFar - zNear);
