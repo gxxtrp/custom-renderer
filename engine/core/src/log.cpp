@@ -24,6 +24,7 @@ spdlog::level::level_enum toSpdlogLevel(LogLevel level) {
     case LogLevel::Error:
         return spdlog::level::err;
     case LogLevel::Critical:
+    case LogLevel::Fatal:
         return spdlog::level::critical;
     case LogLevel::Off:
         return spdlog::level::off;
@@ -62,11 +63,13 @@ void Log::setLevel(LogLevel level) {
     }
 }
 
-spdlog::logger* Log::getLogger() {
+void Log::log(LogLevel level, std::string_view message) {
     if (!sLogger) {
         init();
     }
-    return sLogger.get();
+
+    const auto spdLevel = toSpdlogLevel(level);
+    sLogger->log(spdLevel, message);
 }
 
 }  // namespace engine::core

@@ -22,7 +22,7 @@ int main(int /*argc*/, char** /*argv*/) {
     ENGINE_LOG_INFO(" Starting Scenario: m1_window");
     ENGINE_LOG_INFO("=================================================");
 
-    // Verify Linear Allocator
+    // Verify Linear Allocator & std::span views
     {
         constexpr usize allocatorSize = 1024ULL * 1024ULL;  // 1MB
         LinearAllocator frameAllocator(allocatorSize);
@@ -31,6 +31,16 @@ int main(int /*argc*/, char** /*argv*/) {
             ENGINE_LOG_INFO("LinearAllocator test passed: Allocated at offset {} bytes",
                             frameAllocator.getAllocatedBytes());
         }
+
+        std::span<f32> slice = frameAllocator.allocateSpan<f32>(4);
+        if (slice.size() == 4) {
+            slice[0] = 10.0f;
+            slice[1] = 20.0f;
+            slice[2] = 30.0f;
+            slice[3] = 40.0f;
+            ENGINE_LOG_INFO("LinearAllocator span view test passed: {} elements allocated", slice.size());
+        }
+
         frameAllocator.reset();
     }
 
@@ -44,11 +54,10 @@ int main(int /*argc*/, char** /*argv*/) {
                         transformedPoint.z);
     }
 
-    // Initialize Platform subsystem
+    // Initialize Platform subsystem (std::expected error handling)
     auto initResult = Platform::init();
     if (!initResult) {
-        ENGINE_LOG_CRITICAL("Failed to initialize platform subsystem: {}", initResult.error());
-        return 1;
+        ENGINE_LOG_FATAL("Failed to initialize platform subsystem: {}", initResult.error());
     }
 
     {
@@ -60,9 +69,7 @@ int main(int /*argc*/, char** /*argv*/) {
 
         auto windowResult = Window::create(desc);
         if (!windowResult) {
-            ENGINE_LOG_CRITICAL("Failed to create native window: {}", windowResult.error());
-            Platform::shutdown();
-            return 1;
+            ENGINE_LOG_FATAL("Failed to create native window: {}", windowResult.error());
         }
 
         Window window = std::move(windowResult.value());

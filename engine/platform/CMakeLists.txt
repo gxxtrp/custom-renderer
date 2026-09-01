@@ -3,5 +3,6 @@ engine_add_module(
     NAMESPACE engine
     PUBLIC_DEPS
         engine::core
+    PRIVATE_DEPS
         sdl::sdl
 )

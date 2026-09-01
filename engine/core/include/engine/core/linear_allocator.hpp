@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <new>
+#include <span>
 #include <utility>
 
 #include <engine/core/types.hpp>
@@ -37,6 +38,15 @@ public:
         }
         void* const memory = allocate(sizeof(T) * count, alignment);
         return static_cast<T*>(memory);
+    }
+
+    template<typename T>
+    std::span<T> allocateSpan(usize count, usize alignment = alignof(T)) {
+        T* const arrayPtr = allocateArray<T>(count, alignment);
+        if (!arrayPtr) {
+            return {};
+        }
+        return std::span<T>(arrayPtr, count);
     }
 
     void reset() noexcept;

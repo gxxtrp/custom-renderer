@@ -2,8 +2,8 @@
 
 #include <array>
 
-#include <engine/core/math.hpp>
 #include <engine/core/types.hpp>
+#include <engine/core/vec2.hpp>
 #include <engine/platform/key_codes.hpp>
 
 namespace engine::platform {
