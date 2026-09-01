@@ -8,8 +8,12 @@ namespace engine::rhi_vulkan {
 
 class VulkanCommandBuffer final : public rhi::CommandBuffer {
 public:
-  VulkanCommandBuffer(VkDevice device, VkCommandBuffer cmdBuffer,
-                      PFN_vkCmdDrawMeshTasksEXT pfnCmdDrawMeshTasks = nullptr);
+  VulkanCommandBuffer(
+      VkDevice device, VkCommandBuffer cmdBuffer,
+      PFN_vkCmdDrawMeshTasksEXT pfnCmdDrawMeshTasks = nullptr,
+      PFN_vkCmdDrawMeshTasksIndirectEXT pfnCmdDrawMeshTasksIndirect = nullptr,
+      PFN_vkCmdDrawMeshTasksIndirectCountEXT pfnCmdDrawMeshTasksIndirectCount =
+          nullptr);
   ~VulkanCommandBuffer() override = default;
 
   VulkanCommandBuffer(const VulkanCommandBuffer &) = delete;
@@ -35,8 +39,17 @@ public:
   void bindDescriptorSet(rhi::DescriptorSet &set, core::u32 setIndex) override;
   void pushConstants(rhi::PipelineStageFlags stages, core::u32 offset,
                      core::u32 size, const void *data) override;
+  void dispatch(core::u32 groupCountX, core::u32 groupCountY,
+                core::u32 groupCountZ) override;
   void drawMeshTasks(core::u32 groupCountX, core::u32 groupCountY,
                      core::u32 groupCountZ) override;
+  void drawMeshTasksIndirect(rhi::Buffer &buffer, core::usize offset,
+                             core::u32 drawCount, core::u32 stride) override;
+  void drawMeshTasksIndirectCount(rhi::Buffer &buffer, core::usize offset,
+                                  rhi::Buffer &countBuffer,
+                                  core::usize countBufferOffset,
+                                  core::u32 maxDrawCount,
+                                  core::u32 stride) override;
   void copyBuffer(rhi::Buffer &src, rhi::Buffer &dst, core::usize size,
                   core::usize srcOffset = 0,
                   core::usize dstOffset = 0) override;
@@ -49,6 +62,9 @@ private:
   VkDevice m_device{VK_NULL_HANDLE};
   VkCommandBuffer m_commandBuffer{VK_NULL_HANDLE};
   PFN_vkCmdDrawMeshTasksEXT m_pfnCmdDrawMeshTasks{nullptr};
+  PFN_vkCmdDrawMeshTasksIndirectEXT m_pfnCmdDrawMeshTasksIndirect{nullptr};
+  PFN_vkCmdDrawMeshTasksIndirectCountEXT m_pfnCmdDrawMeshTasksIndirectCount{
+      nullptr};
   class VulkanPipeline *m_currentPipeline{nullptr};
 };
 

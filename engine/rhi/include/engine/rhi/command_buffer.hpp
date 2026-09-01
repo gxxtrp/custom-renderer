@@ -92,8 +92,17 @@ public:
   virtual void bindDescriptorSet(DescriptorSet &set, core::u32 setIndex) = 0;
   virtual void pushConstants(PipelineStageFlags stages, core::u32 offset,
                              core::u32 size, const void *data) = 0;
+  virtual void dispatch(core::u32 groupCountX, core::u32 groupCountY,
+                        core::u32 groupCountZ) = 0;
   virtual void drawMeshTasks(core::u32 groupCountX, core::u32 groupCountY,
                              core::u32 groupCountZ) = 0;
+  virtual void drawMeshTasksIndirect(Buffer &buffer, core::usize offset,
+                                     core::u32 drawCount, core::u32 stride) = 0;
+  virtual void drawMeshTasksIndirectCount(Buffer &buffer, core::usize offset,
+                                          Buffer &countBuffer,
+                                          core::usize countBufferOffset,
+                                          core::u32 maxDrawCount,
+                                          core::u32 stride) = 0;
   virtual void copyBuffer(Buffer &src, Buffer &dst, core::usize size,
                           core::usize srcOffset = 0,
                           core::usize dstOffset = 0) = 0;

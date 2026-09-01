@@ -67,7 +67,7 @@
             "description": "Optimized configuration with Tracy profiling instrumentation",
             "inherits": ["windows-base", "linux-base"],
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_BUILD_TYPE": "Release",
                 "ENGINE_PROFILING_ENABLE": "ON"
             }
         },

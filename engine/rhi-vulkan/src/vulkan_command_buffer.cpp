@@ -12,15 +12,23 @@ namespace engine::rhi_vulkan {
 
 VulkanCommandBuffer::VulkanCommandBuffer(
     VkDevice device, VkCommandBuffer cmdBuffer,
-    PFN_vkCmdDrawMeshTasksEXT pfnCmdDrawMeshTasks)
+    PFN_vkCmdDrawMeshTasksEXT pfnCmdDrawMeshTasks,
+    PFN_vkCmdDrawMeshTasksIndirectEXT pfnCmdDrawMeshTasksIndirect,
+    PFN_vkCmdDrawMeshTasksIndirectCountEXT pfnCmdDrawMeshTasksIndirectCount)
     : m_device(device), m_commandBuffer(cmdBuffer),
-      m_pfnCmdDrawMeshTasks(pfnCmdDrawMeshTasks) {}
+      m_pfnCmdDrawMeshTasks(pfnCmdDrawMeshTasks),
+      m_pfnCmdDrawMeshTasksIndirect(pfnCmdDrawMeshTasksIndirect),
+      m_pfnCmdDrawMeshTasksIndirectCount(pfnCmdDrawMeshTasksIndirectCount) {}
 
 VulkanCommandBuffer::VulkanCommandBuffer(VulkanCommandBuffer &&other) noexcept
     : m_device(std::exchange(other.m_device, VK_NULL_HANDLE)),
       m_commandBuffer(std::exchange(other.m_commandBuffer, VK_NULL_HANDLE)),
       m_pfnCmdDrawMeshTasks(
-          std::exchange(other.m_pfnCmdDrawMeshTasks, nullptr)) {}
+          std::exchange(other.m_pfnCmdDrawMeshTasks, nullptr)),
+      m_pfnCmdDrawMeshTasksIndirect(
+          std::exchange(other.m_pfnCmdDrawMeshTasksIndirect, nullptr)),
+      m_pfnCmdDrawMeshTasksIndirectCount(
+          std::exchange(other.m_pfnCmdDrawMeshTasksIndirectCount, nullptr)) {}
 
 VulkanCommandBuffer &
 VulkanCommandBuffer::operator=(VulkanCommandBuffer &&other) noexcept {
@@ -28,6 +36,10 @@ VulkanCommandBuffer::operator=(VulkanCommandBuffer &&other) noexcept {
     m_device = std::exchange(other.m_device, VK_NULL_HANDLE);
     m_commandBuffer = std::exchange(other.m_commandBuffer, VK_NULL_HANDLE);
     m_pfnCmdDrawMeshTasks = std::exchange(other.m_pfnCmdDrawMeshTasks, nullptr);
+    m_pfnCmdDrawMeshTasksIndirect =
+        std::exchange(other.m_pfnCmdDrawMeshTasksIndirect, nullptr);
+    m_pfnCmdDrawMeshTasksIndirectCount =
+        std::exchange(other.m_pfnCmdDrawMeshTasksIndirectCount, nullptr);
   }
   return *this;
 }
@@ -247,12 +259,40 @@ void VulkanCommandBuffer::pushConstants(rhi::PipelineStageFlags stages,
                      VK_SHADER_STAGE_ALL, offset, size, data);
 }
 
+void VulkanCommandBuffer::dispatch(core::u32 groupCountX, core::u32 groupCountY,
+                                   core::u32 groupCountZ) {
+  vkCmdDispatch(m_commandBuffer, groupCountX, groupCountY, groupCountZ);
+}
+
 void VulkanCommandBuffer::drawMeshTasks(core::u32 groupCountX,
                                         core::u32 groupCountY,
                                         core::u32 groupCountZ) {
   if (m_pfnCmdDrawMeshTasks != nullptr) {
     m_pfnCmdDrawMeshTasks(m_commandBuffer, groupCountX, groupCountY,
                           groupCountZ);
+  }
+}
+
+void VulkanCommandBuffer::drawMeshTasksIndirect(rhi::Buffer &buffer,
+                                                core::usize offset,
+                                                core::u32 drawCount,
+                                                core::u32 stride) {
+  if (m_pfnCmdDrawMeshTasksIndirect != nullptr) {
+    auto &vkBuf = static_cast<VulkanBuffer &>(buffer);
+    m_pfnCmdDrawMeshTasksIndirect(m_commandBuffer, vkBuf.getVkBuffer(), offset,
+                                  drawCount, stride);
+  }
+}
+
+void VulkanCommandBuffer::drawMeshTasksIndirectCount(
+    rhi::Buffer &buffer, core::usize offset, rhi::Buffer &countBuffer,
+    core::usize countBufferOffset, core::u32 maxDrawCount, core::u32 stride) {
+  if (m_pfnCmdDrawMeshTasksIndirectCount != nullptr) {
+    auto &vkBuf = static_cast<VulkanBuffer &>(buffer);
+    auto &vkCountBuf = static_cast<VulkanBuffer &>(countBuffer);
+    m_pfnCmdDrawMeshTasksIndirectCount(m_commandBuffer, vkBuf.getVkBuffer(),
+                                       offset, vkCountBuf.getVkBuffer(),
+                                       countBufferOffset, maxDrawCount, stride);
   }
 }
 

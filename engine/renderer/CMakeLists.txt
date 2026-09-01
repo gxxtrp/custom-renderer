@@ -4,4 +4,6 @@ engine_add_module(
     PUBLIC_DEPS
         engine::core
         engine::rhi
+        engine::scene
+        engine::assets
 )

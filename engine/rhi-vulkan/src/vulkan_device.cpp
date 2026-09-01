@@ -27,14 +27,20 @@ struct VulkanDevice::Impl {
   VkQueue transferQueue{VK_NULL_HANDLE};
   VkCommandPool transientCommandPool{VK_NULL_HANDLE};
   PFN_vkCmdDrawMeshTasksEXT pfnCmdDrawMeshTasks{nullptr};
+  PFN_vkCmdDrawMeshTasksIndirectEXT pfnCmdDrawMeshTasksIndirect{nullptr};
+  PFN_vkCmdDrawMeshTasksIndirectCountEXT pfnCmdDrawMeshTasksIndirectCount{
+      nullptr};
 
   Impl(VulkanInstance inst, VulkanPhysicalDevice physDev, VkDevice dev,
        VmaAllocator alloc, VkQueue gQueue, VkQueue cQueue, VkQueue tQueue,
-       VkCommandPool pool, PFN_vkCmdDrawMeshTasksEXT pfn)
+       VkCommandPool pool, PFN_vkCmdDrawMeshTasksEXT pfn,
+       PFN_vkCmdDrawMeshTasksIndirectEXT pfnIndirect,
+       PFN_vkCmdDrawMeshTasksIndirectCountEXT pfnIndirectCount)
       : instance(std::move(inst)), physicalDevice(std::move(physDev)),
         device(dev), allocator(alloc), graphicsQueue(gQueue),
         computeQueue(cQueue), transferQueue(tQueue), transientCommandPool(pool),
-        pfnCmdDrawMeshTasks(pfn) {}
+        pfnCmdDrawMeshTasks(pfn), pfnCmdDrawMeshTasksIndirect(pfnIndirect),
+        pfnCmdDrawMeshTasksIndirectCount(pfnIndirectCount) {}
 
   ~Impl() {
     if (device != VK_NULL_HANDLE) {
@@ -169,6 +175,12 @@ VulkanDevice::create(const rhi::DeviceDesc &desc) {
 
   auto pfnCmdDrawMeshTasks = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(
       vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksEXT"));
+  auto pfnCmdDrawMeshTasksIndirect =
+      reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectEXT>(
+          vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectEXT"));
+  auto pfnCmdDrawMeshTasksIndirectCount =
+      reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectCountEXT>(
+          vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectCountEXT"));
 
   VkQueue graphicsQueue = VK_NULL_HANDLE;
   VkQueue computeQueue = VK_NULL_HANDLE;
@@ -218,10 +230,11 @@ VulkanDevice::create(const rhi::DeviceDesc &desc) {
 
   ENGINE_LOG_INFO("Vulkan logical device created successfully");
 
-  auto impl =
-      std::make_unique<Impl>(std::move(instance), std::move(physDevice), device,
-                             allocator, graphicsQueue, computeQueue,
-                             transferQueue, transientPool, pfnCmdDrawMeshTasks);
+  auto impl = std::make_unique<Impl>(
+      std::move(instance), std::move(physDevice), device, allocator,
+      graphicsQueue, computeQueue, transferQueue, transientPool,
+      pfnCmdDrawMeshTasks, pfnCmdDrawMeshTasksIndirect,
+      pfnCmdDrawMeshTasksIndirectCount);
 
   return std::unique_ptr<VulkanDevice>(new VulkanDevice(std::move(impl)));
 }
@@ -308,8 +321,10 @@ VulkanDevice::createCommandBuffer(const rhi::CommandBufferDesc & /*desc*/) {
                            std::string(vkResultToString(res)));
   }
 
-  return std::make_unique<VulkanCommandBuffer>(m_impl->device, cmd,
-                                               m_impl->pfnCmdDrawMeshTasks);
+  return std::make_unique<VulkanCommandBuffer>(
+      m_impl->device, cmd, m_impl->pfnCmdDrawMeshTasks,
+      m_impl->pfnCmdDrawMeshTasksIndirect,
+      m_impl->pfnCmdDrawMeshTasksIndirectCount);
 }
 
 void VulkanDevice::submit(const rhi::SubmitInfo &submitInfo) {
