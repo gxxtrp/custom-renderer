@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "vulkan_buffer.hpp"
+#include "vulkan_sampler.hpp"
 #include "vulkan_texture.hpp"
 
 namespace engine::rhi_vulkan {
@@ -315,6 +316,48 @@ void VulkanDescriptorSet::updateTextures(
   write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
   write.descriptorCount = static_cast<core::u32>(imgInfos.size());
   write.pImageInfo = imgInfos.data();
+
+  vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
+}
+
+void VulkanDescriptorSet::updateSampler(core::u32 binding,
+                                        const rhi::SamplerBindingInfo &info) {
+  updateSamplers(binding, 0,
+                 std::span<const rhi::SamplerBindingInfo>(&info, 1));
+}
+
+void VulkanDescriptorSet::updateSamplers(
+    core::u32 binding, core::u32 firstElement,
+    std::span<const rhi::SamplerBindingInfo> infos) {
+  if (infos.empty()) {
+    return;
+  }
+
+  std::vector<VkDescriptorImageInfo> samplerInfos;
+  samplerInfos.reserve(infos.size());
+
+  for (const auto &info : infos) {
+    if (info.sampler == nullptr) {
+      continue;
+    }
+    auto &vkSampler = static_cast<const VulkanSampler &>(*info.sampler);
+    VkDescriptorImageInfo sInfo{};
+    sInfo.sampler = vkSampler.getVkSampler();
+    samplerInfos.push_back(sInfo);
+  }
+
+  if (samplerInfos.empty()) {
+    return;
+  }
+
+  VkWriteDescriptorSet write{};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.dstSet = m_descriptorSet;
+  write.dstBinding = binding;
+  write.dstArrayElement = firstElement;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+  write.descriptorCount = static_cast<core::u32>(samplerInfos.size());
+  write.pImageInfo = samplerInfos.data();
 
   vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
 }

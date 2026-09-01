@@ -31,6 +31,10 @@ public:
                      const rhi::TextureBindingInfo &info) override;
   void updateTextures(core::u32 binding, core::u32 firstElement,
                       std::span<const rhi::TextureBindingInfo> infos) override;
+  void updateSampler(core::u32 binding,
+                     const rhi::SamplerBindingInfo &info) override;
+  void updateSamplers(core::u32 binding, core::u32 firstElement,
+                      std::span<const rhi::SamplerBindingInfo> infos) override;
 
   [[nodiscard]] VkDescriptorSet getVkDescriptorSet() const noexcept {
     return m_descriptorSet;

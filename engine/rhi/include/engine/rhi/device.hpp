@@ -12,6 +12,7 @@
 #include <engine/rhi/descriptor_set.hpp>
 #include <engine/rhi/enums.hpp>
 #include <engine/rhi/pipeline.hpp>
+#include <engine/rhi/sampler.hpp>
 #include <engine/rhi/swapchain.hpp>
 #include <engine/rhi/sync.hpp>
 #include <engine/rhi/texture.hpp>
@@ -45,6 +46,8 @@ public:
   createBuffer(const BufferDesc &desc) = 0;
   virtual std::expected<std::unique_ptr<Texture>, std::string>
   createTexture(const TextureDesc &desc) = 0;
+  virtual std::expected<std::unique_ptr<Sampler>, std::string>
+  createSampler(const SamplerDesc &desc) = 0;
   virtual std::expected<std::unique_ptr<Pipeline>, std::string>
   createPipeline(const PipelineDesc &desc) = 0;
   virtual std::expected<std::unique_ptr<DescriptorSet>, std::string>

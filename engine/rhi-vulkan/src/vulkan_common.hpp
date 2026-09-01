@@ -43,5 +43,12 @@ toVkPipelineStageFlags2(rhi::PipelineStageFlags stage) noexcept;
 fromVkPresentMode(VkPresentModeKHR mode) noexcept;
 [[nodiscard]] VkShaderStageFlags
 toVkShaderStageFlags(rhi::PipelineStageFlags stages) noexcept;
+[[nodiscard]] VkFilter toVkFilter(rhi::Filter filter) noexcept;
+[[nodiscard]] VkSamplerMipmapMode
+toVkSamplerMipmapMode(rhi::SamplerMipmapMode mode) noexcept;
+[[nodiscard]] VkSamplerAddressMode
+toVkSamplerAddressMode(rhi::SamplerAddressMode mode) noexcept;
+[[nodiscard]] VkBorderColor toVkBorderColor(rhi::BorderColor color) noexcept;
+[[nodiscard]] VkCompareOp toVkCompareOp(rhi::CompareOp op) noexcept;
 
 } // namespace engine::rhi_vulkan

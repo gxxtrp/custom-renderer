@@ -16,17 +16,6 @@ enum class FrontFace : core::u8 { CounterClockwise = 0, Clockwise };
 
 enum class PolygonMode : core::u8 { Fill = 0, Line, Point };
 
-enum class CompareOp : core::u8 {
-  Never = 0,
-  Less,
-  Equal,
-  LessOrEqual,
-  Greater,
-  NotEqual,
-  GreaterOrEqual,
-  Always
-};
-
 struct RasterizerState {
   core::f32 lineWidth{1.0f};
   PolygonMode polygonMode{PolygonMode::Fill};

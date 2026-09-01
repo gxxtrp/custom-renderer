@@ -48,29 +48,6 @@ VkFrontFace toVkFrontFace(rhi::FrontFace face) {
   }
 }
 
-VkCompareOp toVkCompareOp(rhi::CompareOp op) {
-  switch (op) {
-  case rhi::CompareOp::Never:
-    return VK_COMPARE_OP_NEVER;
-  case rhi::CompareOp::Less:
-    return VK_COMPARE_OP_LESS;
-  case rhi::CompareOp::Equal:
-    return VK_COMPARE_OP_EQUAL;
-  case rhi::CompareOp::LessOrEqual:
-    return VK_COMPARE_OP_LESS_OR_EQUAL;
-  case rhi::CompareOp::Greater:
-    return VK_COMPARE_OP_GREATER;
-  case rhi::CompareOp::NotEqual:
-    return VK_COMPARE_OP_NOT_EQUAL;
-  case rhi::CompareOp::GreaterOrEqual:
-    return VK_COMPARE_OP_GREATER_OR_EQUAL;
-  case rhi::CompareOp::Always:
-    return VK_COMPARE_OP_ALWAYS;
-  default:
-    return VK_COMPARE_OP_LESS_OR_EQUAL;
-  }
-}
-
 VkShaderModule createShaderModule(VkDevice device,
                                   std::span<const core::u8> code) {
   if (code.empty()) {

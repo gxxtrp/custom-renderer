@@ -476,4 +476,87 @@ toVkShaderStageFlags(rhi::PipelineStageFlags stages) noexcept {
   return flags ? flags : VK_SHADER_STAGE_ALL;
 }
 
+VkFilter toVkFilter(rhi::Filter filter) noexcept {
+  switch (filter) {
+  case rhi::Filter::Nearest:
+    return VK_FILTER_NEAREST;
+  case rhi::Filter::Linear:
+    return VK_FILTER_LINEAR;
+  default:
+    return VK_FILTER_LINEAR;
+  }
+}
+
+VkSamplerMipmapMode
+toVkSamplerMipmapMode(rhi::SamplerMipmapMode mode) noexcept {
+  switch (mode) {
+  case rhi::SamplerMipmapMode::Nearest:
+    return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+  case rhi::SamplerMipmapMode::Linear:
+    return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  default:
+    return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  }
+}
+
+VkSamplerAddressMode
+toVkSamplerAddressMode(rhi::SamplerAddressMode mode) noexcept {
+  switch (mode) {
+  case rhi::SamplerAddressMode::Repeat:
+    return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  case rhi::SamplerAddressMode::MirroredRepeat:
+    return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+  case rhi::SamplerAddressMode::ClampToEdge:
+    return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+  case rhi::SamplerAddressMode::ClampToBorder:
+    return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  case rhi::SamplerAddressMode::MirrorClampToEdge:
+    return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+  default:
+    return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  }
+}
+
+VkBorderColor toVkBorderColor(rhi::BorderColor color) noexcept {
+  switch (color) {
+  case rhi::BorderColor::FloatTransparentBlack:
+    return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+  case rhi::BorderColor::IntTransparentBlack:
+    return VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
+  case rhi::BorderColor::FloatOpaqueBlack:
+    return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+  case rhi::BorderColor::IntOpaqueBlack:
+    return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+  case rhi::BorderColor::FloatOpaqueWhite:
+    return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+  case rhi::BorderColor::IntOpaqueWhite:
+    return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+  default:
+    return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+  }
+}
+
+VkCompareOp toVkCompareOp(rhi::CompareOp op) noexcept {
+  switch (op) {
+  case rhi::CompareOp::Never:
+    return VK_COMPARE_OP_NEVER;
+  case rhi::CompareOp::Less:
+    return VK_COMPARE_OP_LESS;
+  case rhi::CompareOp::Equal:
+    return VK_COMPARE_OP_EQUAL;
+  case rhi::CompareOp::LessOrEqual:
+    return VK_COMPARE_OP_LESS_OR_EQUAL;
+  case rhi::CompareOp::Greater:
+    return VK_COMPARE_OP_GREATER;
+  case rhi::CompareOp::NotEqual:
+    return VK_COMPARE_OP_NOT_EQUAL;
+  case rhi::CompareOp::GreaterOrEqual:
+    return VK_COMPARE_OP_GREATER_OR_EQUAL;
+  case rhi::CompareOp::Always:
+    return VK_COMPARE_OP_ALWAYS;
+  default:
+    return VK_COMPARE_OP_ALWAYS;
+  }
+}
+
 } // namespace engine::rhi_vulkan

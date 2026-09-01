@@ -261,6 +261,36 @@ enum class TextureDimension : core::u8 {
   TextureCube
 };
 
-enum class IndexType : core::u8 { Uint16 = 0, Uint32 };
+enum class CompareOp : core::u8 {
+  Never = 0,
+  Less,
+  Equal,
+  LessOrEqual,
+  Greater,
+  NotEqual,
+  GreaterOrEqual,
+  Always
+};
+
+enum class Filter : core::u8 { Nearest = 0, Linear };
+
+enum class SamplerMipmapMode : core::u8 { Nearest = 0, Linear };
+
+enum class SamplerAddressMode : core::u8 {
+  Repeat = 0,
+  MirroredRepeat,
+  ClampToEdge,
+  ClampToBorder,
+  MirrorClampToEdge
+};
+
+enum class BorderColor : core::u8 {
+  FloatTransparentBlack = 0,
+  IntTransparentBlack,
+  FloatOpaqueBlack,
+  IntOpaqueBlack,
+  FloatOpaqueWhite,
+  IntOpaqueWhite
+};
 
 } // namespace engine::rhi

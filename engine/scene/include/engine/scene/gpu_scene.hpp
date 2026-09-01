@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include <engine/assets/material_asset.hpp>
 #include <engine/assets/mesh_asset.hpp>
 #include <engine/core/types.hpp>
 #include <engine/ecs/world.hpp>
@@ -45,12 +46,20 @@ public:
   [[nodiscard]] RegisteredMesh registerMesh(rhi::Device &device,
                                             const assets::MeshAsset &meshAsset);
 
+  [[nodiscard]] core::u32
+  registerMaterial(const assets::GpuMaterialData &material);
+  void setMaterial(core::u32 materialId,
+                   const assets::GpuMaterialData &material);
+
   void extractFromEcs(ecs::World &world);
 
   void uploadDelta(rhi::Device &device, rhi::CommandBuffer &cmd);
 
   [[nodiscard]] rhi::Buffer *getInstanceBuffer() const noexcept {
     return m_instanceBuffer.get();
+  }
+  [[nodiscard]] rhi::Buffer *getMaterialBuffer() const noexcept {
+    return m_materialBuffer.get();
   }
   [[nodiscard]] rhi::Buffer *getMeshletBuffer() const noexcept {
     return m_meshletBuffer.get();
@@ -72,6 +81,10 @@ public:
     return static_cast<core::u32>(m_instances.size());
   }
 
+  [[nodiscard]] core::u32 getMaterialCount() const noexcept {
+    return static_cast<core::u32>(m_materials.size());
+  }
+
   [[nodiscard]] core::u32 getTotalMeshletCount() const noexcept {
     return m_totalMeshletCount;
   }
@@ -84,6 +97,11 @@ public:
     return m_instances;
   }
 
+  [[nodiscard]] std::span<const assets::GpuMaterialData>
+  getMaterials() const noexcept {
+    return m_materials;
+  }
+
   [[nodiscard]] std::span<const RegisteredMesh>
   getRegisteredMeshes() const noexcept {
     return m_registeredMeshes;
@@ -91,10 +109,15 @@ public:
 
 private:
   void ensureInstanceBuffers(rhi::Device &device, core::usize requiredCount);
+  void ensureMaterialBuffers(rhi::Device &device, core::usize requiredCount);
 
   std::vector<GpuInstanceData> m_instances;
   std::vector<core::u32> m_dirtyInstanceIndices;
   std::vector<bool> m_isDirty;
+
+  std::vector<assets::GpuMaterialData> m_materials;
+  std::vector<core::u32> m_dirtyMaterialIndices;
+  std::vector<bool> m_isMaterialDirty;
 
   std::vector<assets::Meshlet> m_globalMeshlets;
   std::vector<assets::Vertex> m_globalVertices;
@@ -105,6 +128,8 @@ private:
 
   std::unique_ptr<rhi::Buffer> m_instanceBuffer;
   std::unique_ptr<rhi::Buffer> m_instanceStagingBuffer;
+  std::unique_ptr<rhi::Buffer> m_materialBuffer;
+  std::unique_ptr<rhi::Buffer> m_materialStagingBuffer;
   std::unique_ptr<rhi::Buffer> m_meshletBuffer;
   std::unique_ptr<rhi::Buffer> m_vertexBuffer;
   std::unique_ptr<rhi::Buffer> m_meshletVertexBuffer;
@@ -112,8 +137,10 @@ private:
   std::unique_ptr<rhi::Buffer> m_globalIndexBuffer;
 
   core::usize m_instanceBufferCapacity{0};
+  core::usize m_materialBufferCapacity{0};
   core::u32 m_totalMeshletCount{0};
   bool m_fullReuploadRequired{true};
+  bool m_materialFullReuploadRequired{true};
 };
 
 } // namespace engine::scene
